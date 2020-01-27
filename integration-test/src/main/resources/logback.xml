@@ -28,4 +28,9 @@
         <appender-ref ref="SUITE_BASED" />
     </root>
 
+    <logger name="sun.security" level="DEBUG" additivity="false">
+        <appender-ref ref="SUITE_BASED"/>
+        <appender-ref ref="STDOUT"/>
+    </logger>
+
 </configuration>

@@ -68,7 +68,7 @@ public class RestClientUtil {
         return client;
     }
 
-    private static Client createClient(ConfigKey configKey) {
+    public static Client createClient(ConfigKey configKey) {
         LOGGER.debug("Constructing jax rs client: {}", configKey);
         ClientConfig config = new ClientConfig();
         config.property(ClientProperties.FOLLOW_REDIRECTS, "false");

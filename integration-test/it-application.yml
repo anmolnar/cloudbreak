@@ -8,8 +8,8 @@ mock:
 integrationtest:
   outputdir: /it
   spark:
-    sparkPoolSize: 8
-  threadCount: 2
+    sparkPoolSize: 10
+  threadCount: 4
   parallel: classes
   defaultBlueprintName: hdp-small-default
   command: suites
