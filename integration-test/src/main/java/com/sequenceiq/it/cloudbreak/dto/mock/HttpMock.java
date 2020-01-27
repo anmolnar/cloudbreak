@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 
+import com.sequenceiq.flow.api.model.FlowLogResponse;
 import com.sequenceiq.it.TestParameter;
 import com.sequenceiq.it.cloudbreak.CloudbreakClient;
 import com.sequenceiq.it.cloudbreak.Prototype;
@@ -85,6 +86,16 @@ public class HttpMock implements CloudbreakTestDto {
 
     public TestContext getTestContext() {
         return testContext;
+    }
+
+    @Override
+    public void setLastKnownFlowLogs(List<FlowLogResponse> lastKnownFlowLogs) {
+
+    }
+
+    @Override
+    public String getLastKnownFlowChainId() {
+        return null;
     }
 
     @Override

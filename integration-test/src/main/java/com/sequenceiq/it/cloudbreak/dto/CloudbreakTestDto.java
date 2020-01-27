@@ -1,11 +1,13 @@
 package com.sequenceiq.it.cloudbreak.dto;
 
+import java.util.List;
 import java.util.Map;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status;
+import com.sequenceiq.flow.api.model.FlowLogResponse;
 import com.sequenceiq.it.cloudbreak.CloudbreakClient;
 import com.sequenceiq.it.cloudbreak.context.Orderable;
 import com.sequenceiq.it.cloudbreak.context.RunningParameter;
@@ -14,6 +16,10 @@ import com.sequenceiq.it.cloudbreak.context.TestContext;
 public interface CloudbreakTestDto extends Orderable {
 
     Logger LOGGER = LoggerFactory.getLogger(CloudbreakTestDto.class);
+
+    void setLastKnownFlowLogs(List<FlowLogResponse> lastKnownFlowLogs);
+
+    String getLastKnownFlowChainId();
 
     CloudbreakTestDto valid();
 

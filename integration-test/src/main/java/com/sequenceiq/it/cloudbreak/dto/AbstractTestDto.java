@@ -13,6 +13,7 @@ import org.apache.commons.lang3.NotImplementedException;
 import org.springframework.beans.factory.annotation.Qualifier;
 
 import com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status;
+import com.sequenceiq.flow.api.model.FlowLogResponse;
 import com.sequenceiq.it.TestParameter;
 import com.sequenceiq.it.cloudbreak.Entity;
 import com.sequenceiq.it.cloudbreak.MicroserviceClient;
@@ -46,6 +47,10 @@ public abstract class AbstractTestDto<R, S, T extends CloudbreakTestDto, U exten
     private Set<S> responses;
 
     private TestContext testContext;
+
+    private List<FlowLogResponse> lastKnownFlowLogs;
+
+    private String lastKnownFlowChainId;
 
     protected AbstractTestDto(String newId) {
         super(newId);
@@ -98,6 +103,24 @@ public abstract class AbstractTestDto<R, S, T extends CloudbreakTestDto, U exten
 
     public TestContext getTestContext() {
         return testContext;
+    }
+
+    public List<FlowLogResponse> getLastKnownFlowLogs() {
+        return lastKnownFlowLogs;
+    }
+
+    @Override
+    public void setLastKnownFlowLogs(List<FlowLogResponse> lastKnownFlowLogs) {
+        this.lastKnownFlowLogs = lastKnownFlowLogs;
+    }
+
+    @Override
+    public String getLastKnownFlowChainId() {
+        return lastKnownFlowChainId;
+    }
+
+    public void setLastKnownFlowChainId(String lastKnownFlowChainId) {
+        this.lastKnownFlowChainId = lastKnownFlowChainId;
     }
 
     @Override
@@ -201,6 +224,10 @@ public abstract class AbstractTestDto<R, S, T extends CloudbreakTestDto, U exten
 
     public T await(Map<String, Status> statuses, RunningParameter runningParameter) {
         return testContext.await((T) this, statuses, runningParameter);
+    }
+
+    public T awaitForFlow(RunningParameter runningParameter) {
+        return testContext.awaitForFlow((T) this, runningParameter);
     }
 
     public <E extends Exception> T expect(Class<E> expectedException) {

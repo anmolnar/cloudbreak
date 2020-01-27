@@ -519,6 +519,26 @@ public abstract class TestContext implements ApplicationContextAware {
         return entity;
     }
 
+    public <T extends SdxTestDto> T awaitForFlow(T entity, RunningParameter runningParameter) {
+        checkShutdown();
+
+        String key = getKeyForAwait(entity, entity.getClass(), runningParameter);
+        SdxTestDto awaitEntity = get(key);
+        SdxClient sdxClient = getMicroserviceClient(SdxClient.class, getWho(runningParameter).getAccessKey());
+        String sdxName = entity.getName();
+        waitUtilSingleStatus.waitBasedOnLastKnownFlow(awaitEntity, sdxClient, sdxName);
+        return entity;
+    }
+
+    public <T extends CloudbreakTestDto> T awaitForFlow(T entity, RunningParameter runningParameter) {
+        checkShutdown();
+        String key = getKeyForAwait(entity, entity.getClass(), runningParameter);
+        CloudbreakTestDto awaitEntity = get(key);
+        CloudbreakClient cloudbreakClient = getCloudbreakClient();
+        waitUtilSingleStatus.waitBasedOnLastKnownFlow(awaitEntity, cloudbreakClient, entity.getName());
+        return entity;
+    }
+
     public FreeIPATestDto await(FreeIPATestDto entity, com.sequenceiq.freeipa.api.v1.freeipa.stack.model.common.Status desiredStatuses,
             RunningParameter runningParameter) {
         return await(entity, desiredStatuses, runningParameter, -1);

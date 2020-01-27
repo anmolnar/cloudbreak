@@ -7,6 +7,7 @@ import static java.lang.String.format;
 
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
@@ -23,12 +24,16 @@ import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.response.instancegroup.i
 import com.sequenceiq.environment.api.v1.environment.endpoint.EnvironmentEndpoint;
 import com.sequenceiq.environment.api.v1.environment.model.response.DetailedEnvironmentResponse;
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentStatus;
+import com.sequenceiq.flow.api.FlowEndpoint;
+import com.sequenceiq.flow.api.model.FlowLogResponse;
+import com.sequenceiq.flow.api.model.StateStatus;
 import com.sequenceiq.freeipa.api.v1.freeipa.stack.FreeIpaV1Endpoint;
 import com.sequenceiq.freeipa.api.v1.freeipa.stack.model.describe.DescribeFreeIpaResponse;
 import com.sequenceiq.it.cloudbreak.CloudbreakClient;
 import com.sequenceiq.it.cloudbreak.EnvironmentClient;
 import com.sequenceiq.it.cloudbreak.FreeIPAClient;
 import com.sequenceiq.it.cloudbreak.SdxClient;
+import com.sequenceiq.it.cloudbreak.dto.CloudbreakTestDto;
 import com.sequenceiq.it.cloudbreak.dto.distrox.DistroXTestDto;
 import com.sequenceiq.it.cloudbreak.dto.sdx.SdxInternalTestDto;
 import com.sequenceiq.it.cloudbreak.dto.sdx.SdxTestDto;
@@ -179,6 +184,34 @@ public class WaitUtil {
             LOGGER.info("Timeout: Desired tatus(es) are {} for {} but status(es) are {}", desiredStatus, name, currentStatus);
         } else {
             LOGGER.info("{} are in desired status(es) {}", name, currentStatus);
+        }
+        return waitResult;
+    }
+
+    public WaitResult waitBasedOnLastKnownFlow(SdxTestDto sdxTestDto, SdxClient sdxClient, String name) {
+        WaitResult waitResult = WaitResult.SUCCESSFUL;
+        boolean flowRunning = true;
+        while (flowRunning) {
+            sleep(pollingInterval);
+            FlowEndpoint flowEndpoint = sdxClient.getSdxClient().flowEndpoint();
+            List<FlowLogResponse> flowLogsByResourceNameAndChainId =
+                    flowEndpoint.getFlowLogsByResourceNameAndChainId(name, sdxTestDto.getLastKnownFlowChainId());
+            flowRunning = flowLogsByResourceNameAndChainId.stream()
+                    .anyMatch(flowLog -> flowLog.getStateStatus().equals(StateStatus.PENDING) || !flowLog.getFinalized());
+        }
+        return waitResult;
+    }
+
+    public WaitResult waitBasedOnLastKnownFlow(CloudbreakTestDto distroXTestDto, CloudbreakClient cloudbreakClient, String name) {
+        WaitResult waitResult = WaitResult.SUCCESSFUL;
+        boolean flowRunning = true;
+        while (flowRunning) {
+            sleep(pollingInterval);
+            FlowEndpoint flowEndpoint = cloudbreakClient.getCloudbreakClient().flowEndpoint();
+            List<FlowLogResponse> flowLogsByResourceNameAndChainId =
+                    flowEndpoint.getFlowLogsByResourceNameAndChainId(name, distroXTestDto.getLastKnownFlowChainId());
+            flowRunning = flowLogsByResourceNameAndChainId.stream()
+                    .anyMatch(flowLog -> flowLog.getStateStatus().equals(StateStatus.PENDING) || !flowLog.getFinalized());
         }
         return waitResult;
     }

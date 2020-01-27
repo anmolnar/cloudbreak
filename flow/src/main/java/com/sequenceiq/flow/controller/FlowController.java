@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.core.convert.ConversionService;
 import org.springframework.stereotype.Controller;
 
-import com.google.api.client.util.Lists;
+import com.google.common.collect.Lists;
 import com.sequenceiq.cloudbreak.auth.altus.Crn;
 import com.sequenceiq.flow.api.FlowEndpoint;
 import com.sequenceiq.flow.api.model.FlowLogResponse;
