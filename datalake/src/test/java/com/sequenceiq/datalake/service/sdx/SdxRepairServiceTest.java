@@ -66,7 +66,7 @@ public class SdxRepairServiceTest {
         cluster.setClusterName(CLUSTER_NAME);
         SdxRepairRequest sdxRepairRequest = new SdxRepairRequest();
         sdxRepairRequest.setHostGroupName("master");
-        doNothing().when(cloudbreakFlowService).getAndSaveLastCloudbreakFlowChainId(any());
+        doNothing().when(cloudbreakFlowService).saveLastCloudbreakFlowChainId(any(), any());
         underTest.startRepairInCb(cluster, sdxRepairRequest);
         verify(stackV4Endpoint).repairCluster(eq(0L), eq(CLUSTER_NAME), captor.capture());
         assertEquals("master", captor.getValue().getHostGroups().get(0));

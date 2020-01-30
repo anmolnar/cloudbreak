@@ -33,6 +33,7 @@ import com.sequenceiq.datalake.flow.statestore.DatalakeInMemoryStateStore;
 import com.sequenceiq.datalake.repository.SdxClusterRepository;
 import com.sequenceiq.datalake.service.sdx.status.SdxStatusService;
 import com.sequenceiq.environment.api.v1.environment.model.response.DetailedEnvironmentResponse;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.redbeams.api.endpoint.v4.databaseserver.responses.DatabaseServerStatusV4Response;
 
 @Service
@@ -61,8 +62,8 @@ public class ProvisionerService {
     public void startStackDeletion(Long id, boolean forced) {
         sdxClusterRepository.findById(id).ifPresentOrElse(sdxCluster -> {
             try {
-                stackV4Endpoint.delete(0L, sdxCluster.getClusterName(), forced);
-                cloudbreakFlowService.getAndSaveLastCloudbreakFlowChainId(sdxCluster);
+                FlowStartResponse flowStartResponse = stackV4Endpoint.delete(0L, sdxCluster.getClusterName(), forced);
+                cloudbreakFlowService.saveLastCloudbreakFlowChainId(sdxCluster, flowStartResponse);
                 sdxStatusService.setStatusForDatalakeAndNotify(DatalakeStatusEnum.STACK_DELETION_IN_PROGRESS,
                         ResourceEvent.SDX_CLUSTER_DELETION_STARTED, "Datalake stack deletion in progress", sdxCluster);
             } catch (NotFoundException e) {
@@ -128,7 +129,7 @@ public class ProvisionerService {
                 sdxCluster.setStackId(stackV4Response.getId());
                 sdxCluster.setStackCrn(stackV4Response.getCrn());
                 sdxClusterRepository.save(sdxCluster);
-                cloudbreakFlowService.getAndSaveLastCloudbreakFlowChainId(sdxCluster);
+                cloudbreakFlowService.saveLastCloudbreakFlowChainId(sdxCluster, stackV4Response);
                 LOGGER.info("Sdx cluster updated");
             } catch (ClientErrorException e) {
                 String errorMessage = webApplicationExceptionMessageExtractor.getErrorMessage(e);

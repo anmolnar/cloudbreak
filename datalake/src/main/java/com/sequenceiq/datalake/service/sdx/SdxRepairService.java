@@ -35,6 +35,7 @@ import com.sequenceiq.datalake.flow.SdxReactorFlowManager;
 import com.sequenceiq.datalake.flow.statestore.DatalakeInMemoryStateStore;
 import com.sequenceiq.datalake.repository.SdxClusterRepository;
 import com.sequenceiq.datalake.service.sdx.status.SdxStatusService;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.sdx.api.model.SdxRepairRequest;
 
 @Service
@@ -63,16 +64,16 @@ public class SdxRepairService {
     @Inject
     private WebApplicationExceptionMessageExtractor webApplicationExceptionMessageExtractor;
 
-    public void triggerRepairByCrn(String userCrn, String clusterCrn, SdxRepairRequest clusterRepairRequest) {
+    public FlowStartResponse triggerRepairByCrn(String userCrn, String clusterCrn, SdxRepairRequest clusterRepairRequest) {
         SdxCluster cluster = sdxService.getByCrn(userCrn, clusterCrn);
         MDCBuilder.buildMdcContext(cluster);
-        sdxReactorFlowManager.triggerSdxRepairFlow(cluster.getId(), clusterRepairRequest);
+        return sdxReactorFlowManager.triggerSdxRepairFlow(cluster.getId(), clusterRepairRequest);
     }
 
-    public void triggerRepairByName(String userCrn, String clusterName, SdxRepairRequest clusterRepairRequest) {
+    public FlowStartResponse triggerRepairByName(String userCrn, String clusterName, SdxRepairRequest clusterRepairRequest) {
         SdxCluster cluster = sdxService.getSdxByNameInAccount(userCrn, clusterName);
         MDCBuilder.buildMdcContext(cluster);
-        sdxReactorFlowManager.triggerSdxRepairFlow(cluster.getId(), clusterRepairRequest);
+        return sdxReactorFlowManager.triggerSdxRepairFlow(cluster.getId(), clusterRepairRequest);
     }
 
     public void startSdxRepair(Long id, SdxRepairRequest repairRequest) {
@@ -86,8 +87,8 @@ public class SdxRepairService {
     protected void startRepairInCb(SdxCluster sdxCluster, SdxRepairRequest repairRequest) {
         try {
             LOGGER.info("Triggering repair flow for cluster {} with hostgroups {}", sdxCluster.getClusterName(), repairRequest.getHostGroupName());
-            stackV4Endpoint.repairCluster(0L, sdxCluster.getClusterName(), createRepairRequest(repairRequest));
-            cloudbreakFlowService.getAndSaveLastCloudbreakFlowChainId(sdxCluster);
+            FlowStartResponse flowStartResponse = stackV4Endpoint.repairCluster(0L, sdxCluster.getClusterName(), createRepairRequest(repairRequest));
+            cloudbreakFlowService.saveLastCloudbreakFlowChainId(sdxCluster, flowStartResponse);
             sdxStatusService.setStatusForDatalakeAndNotify(DatalakeStatusEnum.REPAIR_IN_PROGRESS, ResourceEvent.SDX_REPAIR_STARTED,
                     "Datalake repair in progress", sdxCluster);
         } catch (NotFoundException e) {

@@ -1,5 +1,27 @@
 package com.sequenceiq.datalake.service.sdx;
 
+import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
+import static com.sequenceiq.sdx.api.model.SdxClusterShape.CUSTOM;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.annotation.Nonnull;
+import javax.annotation.Nullable;
+import javax.inject.Inject;
+
+import org.apache.commons.lang3.StringUtils;
+import org.apache.commons.lang3.tuple.Pair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Service;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.StackV4Endpoint;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.request.StackV4Request;
@@ -32,29 +54,11 @@ import com.sequenceiq.datalake.service.EnvironmentClientService;
 import com.sequenceiq.datalake.service.sdx.status.SdxStatusService;
 import com.sequenceiq.datalake.service.validation.cloudstorage.CloudStorageLocationValidator;
 import com.sequenceiq.environment.api.v1.environment.model.response.DetailedEnvironmentResponse;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.core.ResourceIdProvider;
 import com.sequenceiq.sdx.api.model.SdxCloudStorageRequest;
 import com.sequenceiq.sdx.api.model.SdxClusterRequest;
 import com.sequenceiq.sdx.api.model.SdxClusterShape;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
-import static com.sequenceiq.sdx.api.model.SdxClusterShape.CUSTOM;
 
 @Service
 public class SdxService implements ResourceIdProvider {
@@ -142,7 +146,8 @@ public class SdxService implements ResourceIdProvider {
         }
     }
 
-    public SdxCluster createSdx(final String userCrn, final String name, final SdxClusterRequest sdxClusterRequest, final StackV4Request stackV4Request) {
+    public Pair<SdxCluster, FlowStartResponse> createSdx(final String userCrn, final String name, final SdxClusterRequest sdxClusterRequest,
+            final StackV4Request stackV4Request) {
         LOGGER.info("Creating SDX cluster with name {}", name);
         validateSdxRequest(name, sdxClusterRequest.getEnvironment(), getAccountIdFromCrn(userCrn));
         validateInternalSdxRequest(stackV4Request, sdxClusterRequest.getClusterShape());
@@ -183,9 +188,9 @@ public class SdxService implements ResourceIdProvider {
                 ResourceEvent.SDX_CLUSTER_PROVISION_STARTED, "Datalake requested", sdxCluster);
 
         LOGGER.info("trigger SDX creation: {}", sdxCluster);
-        sdxReactorFlowManager.triggerSdxCreation(sdxCluster.getId());
+        FlowStartResponse flowStartResponse = sdxReactorFlowManager.triggerSdxCreation(sdxCluster.getId());
 
-        return sdxCluster;
+        return Pair.of(sdxCluster, flowStartResponse);
     }
 
     private void updateStackV4RequestWithEnvironmentCrnIfNotExistsOnIt(StackV4Request request, String environmentCrn) {
@@ -365,35 +370,32 @@ public class SdxService implements ResourceIdProvider {
         }
     }
 
-    public void deleteSdxByClusterCrn(String userCrn, String clusterCrn, boolean forced) {
+    public FlowStartResponse deleteSdxByClusterCrn(String userCrn, String clusterCrn, boolean forced) {
         LOGGER.info("Deleting SDX {}", clusterCrn);
         String accountIdFromCrn = getAccountIdFromCrn(userCrn);
-        sdxClusterRepository.findByAccountIdAndCrnAndDeletedIsNull(accountIdFromCrn, clusterCrn).ifPresentOrElse(sdxCluster -> {
-            deleteSdxCluster(sdxCluster, forced);
-        }, () -> {
-            throw notFound("SDX cluster", clusterCrn).get();
-        });
+        return sdxClusterRepository.findByAccountIdAndCrnAndDeletedIsNull(accountIdFromCrn, clusterCrn)
+                .map(sdxCluster -> deleteSdxCluster(sdxCluster, forced))
+                .orElseThrow(() -> notFound("SDX cluster", clusterCrn).get());
     }
 
-    public void deleteSdx(String userCrn, String name, boolean forced) {
+    public FlowStartResponse deleteSdx(String userCrn, String name, boolean forced) {
         LOGGER.info("Deleting SDX {}", name);
         String accountIdFromCrn = getAccountIdFromCrn(userCrn);
-        sdxClusterRepository.findByAccountIdAndClusterNameAndDeletedIsNull(accountIdFromCrn, name).ifPresentOrElse(sdxCluster -> {
-            deleteSdxCluster(sdxCluster, forced);
-        }, () -> {
-            throw notFound("SDX cluster", name).get();
-        });
+        return sdxClusterRepository.findByAccountIdAndClusterNameAndDeletedIsNull(accountIdFromCrn, name)
+                .map(sdxCluster -> deleteSdxCluster(sdxCluster, forced))
+                .orElseThrow(() -> notFound("SDX cluster", name).get());
     }
 
-    private void deleteSdxCluster(SdxCluster sdxCluster, boolean forced) {
+    private FlowStartResponse deleteSdxCluster(SdxCluster sdxCluster, boolean forced) {
         checkIfSdxIsDeletable(sdxCluster);
         MDCBuilder.buildMdcContext(sdxCluster);
         sdxClusterRepository.save(sdxCluster);
         sdxStatusService.setStatusForDatalakeAndNotify(DatalakeStatusEnum.DELETE_REQUESTED,
                 ResourceEvent.SDX_CLUSTER_DELETION_STARTED, "Datalake deletion requested", sdxCluster);
-        sdxReactorFlowManager.triggerSdxDeletion(sdxCluster.getId(), forced);
+        FlowStartResponse flowStartResponse = sdxReactorFlowManager.triggerSdxDeletion(sdxCluster.getId(), forced);
         sdxReactorFlowManager.cancelRunningFlows(sdxCluster.getId());
         LOGGER.info("SDX delete triggered: {}", sdxCluster.getClusterName());
+        return flowStartResponse;
     }
 
     private void checkIfSdxIsDeletable(SdxCluster sdxCluster) {

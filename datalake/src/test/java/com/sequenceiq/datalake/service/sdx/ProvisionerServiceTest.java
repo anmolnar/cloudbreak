@@ -4,7 +4,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -52,6 +51,7 @@ import com.sequenceiq.environment.api.v1.environment.model.response.DetailedEnvi
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentAuthenticationResponse;
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentNetworkResponse;
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentStatus;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.redbeams.api.endpoint.v4.databaseserver.responses.DatabaseServerStatusV4Response;
 import com.sequenceiq.sdx.api.model.SdxClusterShape;
 
@@ -97,7 +97,7 @@ class ProvisionerServiceTest {
 
         underTest.startStackProvisioning(CLUSTER_ID, getEnvironmentResponse(), getDatabaseServerResponse());
 
-        verify(cloudbreakFlowService).getAndSaveLastCloudbreakFlowChainId(sdxCluster);
+        verify(cloudbreakFlowService).saveLastCloudbreakFlowChainId(sdxCluster, stackV4Response);
         verify(sdxClusterRepository, times(1)).save(any(SdxCluster.class));
     }
 
@@ -196,7 +196,8 @@ class ProvisionerServiceTest {
         when(sdxClusterRepository.findById(CLUSTER_ID)).thenReturn(Optional.of(sdxCluster));
         StackV4Response stackV4Response = new StackV4Response();
         stackV4Response.setStatus(Status.CREATE_FAILED);
-        doNothing().when(stackV4Endpoint).delete(anyLong(), eq(sdxCluster.getClusterName()), eq(Boolean.TRUE));
+        when(stackV4Endpoint.delete(anyLong(), eq(sdxCluster.getClusterName()), eq(Boolean.TRUE)))
+                .thenReturn(FlowStartResponse.of("FLOW_ID", "FLOW_CHAIN_ID"));
 
         underTest.startStackDeletion(CLUSTER_ID, true);
 

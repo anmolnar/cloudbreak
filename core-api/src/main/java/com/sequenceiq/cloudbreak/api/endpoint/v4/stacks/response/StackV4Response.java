@@ -32,6 +32,7 @@ import com.sequenceiq.cloudbreak.doc.ModelDescriptions.ClusterModelDescription;
 import com.sequenceiq.cloudbreak.doc.ModelDescriptions.StackModelDescription;
 import com.sequenceiq.common.api.telemetry.response.TelemetryResponse;
 import com.sequenceiq.common.api.type.Tunnel;
+import com.sequenceiq.flow.api.model.Pollable;
 
 import io.swagger.annotations.ApiModel;
 import io.swagger.annotations.ApiModelProperty;
@@ -39,7 +40,7 @@ import io.swagger.annotations.ApiModelProperty;
 @ApiModel
 @JsonIgnoreProperties(ignoreUnknown = true)
 @JsonInclude(Include.NON_NULL)
-public class StackV4Response extends StackV4Base {
+public class StackV4Response extends StackV4Base implements Pollable {
 
     private Long id;
 
@@ -121,6 +122,9 @@ public class StackV4Response extends StackV4Base {
 
     @ApiModelProperty(StackModelDescription.TUNNEL)
     private Tunnel tunnel = Tunnel.DIRECT;
+
+    @ApiModelProperty(StackModelDescription.FLOW_CHAIN_ID)
+    private String flowChainId;
 
     public Long getId() {
         return id;
@@ -344,5 +348,14 @@ public class StackV4Response extends StackV4Base {
 
     public void setTunnel(Tunnel tunnel) {
         this.tunnel = tunnel;
+    }
+
+    @Override
+    public String getFlowChainId() {
+        return flowChainId;
+    }
+
+    public void setFlowChainId(String flowChainId) {
+        this.flowChainId = flowChainId;
     }
 }

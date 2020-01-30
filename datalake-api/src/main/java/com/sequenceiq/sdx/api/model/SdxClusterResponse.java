@@ -1,8 +1,9 @@
 package com.sequenceiq.sdx.api.model;
 
 import com.sequenceiq.common.model.FileSystemType;
+import com.sequenceiq.flow.api.model.Pollable;
 
-public class SdxClusterResponse {
+public class SdxClusterResponse implements Pollable {
 
     private String crn;
 
@@ -28,13 +29,16 @@ public class SdxClusterResponse {
 
     private FileSystemType cloudStorageFileSystemType;
 
+    private String flowChainId;
+
     public SdxClusterResponse() {
     }
 
     public SdxClusterResponse(String crn, String name, SdxClusterStatusResponse status,
             String statusReason, String environmentName, String environmentCrn, String stackCrn,
             SdxClusterShape clusterShape,
-            String cloudStorageBaseLocation, FileSystemType cloudStorageFileSystemType) {
+            String cloudStorageBaseLocation, FileSystemType cloudStorageFileSystemType,
+            String flowChainId) {
         this.crn = crn;
         this.name = name;
         this.status = status;
@@ -45,6 +49,7 @@ public class SdxClusterResponse {
         this.clusterShape = clusterShape;
         this.cloudStorageBaseLocation = cloudStorageBaseLocation;
         this.cloudStorageFileSystemType = cloudStorageFileSystemType;
+        this.flowChainId = flowChainId;
     }
 
     public String getCrn() {
@@ -141,5 +146,14 @@ public class SdxClusterResponse {
 
     public void setCloudStorageFileSystemType(FileSystemType cloudStorageFileSystemType) {
         this.cloudStorageFileSystemType = cloudStorageFileSystemType;
+    }
+
+    @Override
+    public String getFlowChainId() {
+        return flowChainId;
+    }
+
+    public void setFlowChainId(String flowChainId) {
+        this.flowChainId = flowChainId;
     }
 }

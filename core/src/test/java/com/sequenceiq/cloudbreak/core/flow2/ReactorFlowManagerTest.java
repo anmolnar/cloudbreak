@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyObject;
+import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -38,8 +39,10 @@ import com.sequenceiq.cloudbreak.exception.CloudbreakApiException;
 import com.sequenceiq.cloudbreak.kerberos.KerberosConfigService;
 import com.sequenceiq.cloudbreak.service.stack.StackService;
 import com.sequenceiq.cloudbreak.service.stack.repair.UnhealthyInstances;
+import com.sequenceiq.flow.domain.FlowLog;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.config.EventBusStatisticReporter;
+import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
 
 import reactor.bus.Event;
 import reactor.bus.EventBus;
@@ -71,6 +74,9 @@ public class ReactorFlowManagerTest {
     @Mock
     private KerberosConfigService kerberosConfigService;
 
+    @Mock
+    private FlowLogDBService flowLogDBService;
+
     private Stack stack;
 
     @InjectMocks
@@ -88,6 +94,10 @@ public class ReactorFlowManagerTest {
         when(stackService.getByIdWithListsInTransaction(anyLong())).thenReturn(stack);
         when(eventFactory.createEventWithErrHandler(any(), any())).thenReturn(new Event<>(acceptable));
         when(authenticatedUserService.getUserCrn()).thenReturn("usercrn");
+        FlowLog flowLog = new FlowLog();
+        flowLog.setFlowId("FLOW_ID");
+        flowLog.setFlowChainId("FLOW_CHAIN_ID");
+        when(flowLogDBService.getLastFlowLogByResourceCrnOrName(anyString())).thenReturn(flowLog);
     }
 
     @Test

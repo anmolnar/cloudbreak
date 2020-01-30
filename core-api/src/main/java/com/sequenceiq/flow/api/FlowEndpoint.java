@@ -29,6 +29,7 @@ public interface FlowEndpoint {
             nickname = "getLastFlowById")
     FlowLogResponse getLastFlowById(@PathParam("flowId") String flowId);
 
+    // TODO: flowId eseten ezt pollozd
     @GET
     @Path("{flowId}")
     @Produces(MediaType.APPLICATION_JSON)
@@ -64,6 +65,7 @@ public interface FlowEndpoint {
             nickname = "getFlowLogsByResourceCrn")
     List<FlowLogResponse> getFlowLogsByResourceCrn(@PathParam("resourceCrn") String resourceCrn);
 
+    // TODO: flowChainId eseten ezt pollozd
     @GET
     @Path("/resource/name/{resourceName}/{chainId}")
     @Produces(MediaType.APPLICATION_JSON)

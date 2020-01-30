@@ -62,10 +62,13 @@ import com.sequenceiq.cloudbreak.reactor.api.event.stack.TerminationEvent;
 import com.sequenceiq.cloudbreak.service.stack.StackService;
 import com.sequenceiq.cloudbreak.service.stack.repair.UnhealthyInstances;
 import com.sequenceiq.cloudbreak.workspace.model.User;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.core.Flow2Handler;
 import com.sequenceiq.flow.core.FlowConstants;
+import com.sequenceiq.flow.domain.FlowLog;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.config.EventBusStatisticReporter;
+import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
 
 import reactor.bus.Event;
 import reactor.bus.EventBus;
@@ -108,35 +111,38 @@ public class ReactorFlowManager {
     @Inject
     private KerberosConfigService kerberosConfigService;
 
-    public void triggerProvisioning(Long stackId) {
+    @Inject
+    private FlowLogDBService flowLogDBService;
+
+    public FlowStartResponse triggerProvisioning(Long stackId) {
         String selector = FlowChainTriggers.FULL_PROVISION_TRIGGER_EVENT;
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
-    public void triggerStackStart(Long stackId) {
+    public FlowStartResponse triggerStackStart(Long stackId) {
         String selector = FlowChainTriggers.FULL_START_TRIGGER_EVENT;
         Acceptable startTriggerEvent = new StackEvent(selector, stackId);
-        notify(stackId, selector, startTriggerEvent);
+        return notify(stackId, selector, startTriggerEvent);
     }
 
-    public void triggerStackStop(Long stackId) {
+    public FlowStartResponse triggerStackStop(Long stackId) {
         String selector = STACK_STOP_EVENT.event();
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
-    public void triggerStackUpscale(Long stackId, InstanceGroupAdjustmentV4Request instanceGroupAdjustment, boolean withClusterEvent) {
+    public FlowStartResponse triggerStackUpscale(Long stackId, InstanceGroupAdjustmentV4Request instanceGroupAdjustment, boolean withClusterEvent) {
         String selector = FlowChainTriggers.FULL_UPSCALE_TRIGGER_EVENT;
         Acceptable stackAndClusterUpscaleTriggerEvent = new StackAndClusterUpscaleTriggerEvent(selector,
                 stackId, instanceGroupAdjustment.getInstanceGroup(), instanceGroupAdjustment.getScalingAdjustment(),
                 withClusterEvent ? ScalingType.UPSCALE_TOGETHER : ScalingType.UPSCALE_ONLY_STACK);
-        notify(stackId, selector, stackAndClusterUpscaleTriggerEvent);
+        return notify(stackId, selector, stackAndClusterUpscaleTriggerEvent);
     }
 
-    public void triggerStackDownscale(Long stackId, InstanceGroupAdjustmentV4Request instanceGroupAdjustment) {
+    public FlowStartResponse triggerStackDownscale(Long stackId, InstanceGroupAdjustmentV4Request instanceGroupAdjustment) {
         String selector = STACK_DOWNSCALE_EVENT.event();
         Acceptable stackScaleTriggerEvent = new StackDownscaleTriggerEvent(selector, stackId, instanceGroupAdjustment.getInstanceGroup(),
                 instanceGroupAdjustment.getScalingAdjustment());
-        notify(stackId, selector, stackScaleTriggerEvent);
+        return notify(stackId, selector, stackScaleTriggerEvent);
     }
 
     public void triggerStackSync(Long stackId) {
@@ -148,20 +154,20 @@ public class ReactorFlowManager {
         triggerStackRemoveInstance(stackId, hostGroup, privateId, false);
     }
 
-    public void triggerStackRemoveInstance(Long stackId, String hostGroup, Long privateId, boolean forced) {
+    public FlowStartResponse triggerStackRemoveInstance(Long stackId, String hostGroup, Long privateId, boolean forced) {
         String selector = FlowChainTriggers.FULL_DOWNSCALE_TRIGGER_EVENT;
         ClusterDownscaleDetails details = new ClusterDownscaleDetails(forced, false);
         ClusterAndStackDownscaleTriggerEvent event = new ClusterAndStackDownscaleTriggerEvent(selector, stackId, hostGroup, Collections.singleton(privateId),
                 ScalingType.DOWNSCALE_TOGETHER, new Promise<>(), details);
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
-    public void triggerStackRemoveInstances(Long stackId, Map<String, Set<Long>> instanceIdsByHostgroupMap, boolean forced) {
+    public FlowStartResponse triggerStackRemoveInstances(Long stackId, Map<String, Set<Long>> instanceIdsByHostgroupMap, boolean forced) {
         String selector = FlowChainTriggers.FULL_DOWNSCALE_MULTIHOSTGROUP_TRIGGER_EVENT;
         ClusterDownscaleDetails details = new ClusterDownscaleDetails(forced, false);
         MultiHostgroupClusterAndStackDownscaleTriggerEvent event = new MultiHostgroupClusterAndStackDownscaleTriggerEvent(selector, stackId,
                 instanceIdsByHostgroupMap, details, ScalingType.DOWNSCALE_TOGETHER, new Promise<>());
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
     public void triggerTermination(Long stackId, Boolean forced) {
@@ -170,9 +176,9 @@ public class ReactorFlowManager {
         cancelRunningFlows(stackId);
     }
 
-    public void triggerClusterInstall(Long stackId) {
+    public FlowStartResponse triggerClusterInstall(Long stackId) {
         String selector = CLUSTER_CREATION_EVENT.event();
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
     public void triggerEphemeralUpdate(Long stackId) {
@@ -180,9 +186,9 @@ public class ReactorFlowManager {
         notify(stackId, selector, new EphemeralClusterUpdateTriggerEvent(selector, stackId));
     }
 
-    public void triggerClusterReInstall(Long stackId) {
+    public FlowStartResponse triggerClusterReInstall(Long stackId) {
         String selector = FlowChainTriggers.CLUSTER_RESET_CHAIN_TRIGGER_EVENT;
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
     public void triggerClusterUpgrade(Long stackId) {
@@ -190,41 +196,41 @@ public class ReactorFlowManager {
         reactor.notify(selector, eventFactory.createEventWithErrHandler(createEventParameters(stackId), new StackEvent(selector, stackId)));
     }
 
-    public void triggerClusterCredentialReplace(Long stackId, String userName, String password) {
+    public FlowStartResponse triggerClusterCredentialReplace(Long stackId, String userName, String password) {
         String selector = CLUSTER_CREDENTIALCHANGE_EVENT.event();
         ClusterCredentialChangeTriggerEvent event = ClusterCredentialChangeTriggerEvent.replaceUserEvent(selector, stackId, userName, password);
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
-    public void triggerClusterCredentialUpdate(Long stackId, String password) {
+    public FlowStartResponse triggerClusterCredentialUpdate(Long stackId, String password) {
         String selector = CLUSTER_CREDENTIALCHANGE_EVENT.event();
         ClusterCredentialChangeTriggerEvent event = ClusterCredentialChangeTriggerEvent.changePasswordEvent(selector, stackId, password);
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
-    public void triggerClusterUpscale(Long stackId, HostGroupAdjustmentV4Request hostGroupAdjustment) {
+    public FlowStartResponse triggerClusterUpscale(Long stackId, HostGroupAdjustmentV4Request hostGroupAdjustment) {
         String selector = CLUSTER_UPSCALE_TRIGGER_EVENT.event();
         Acceptable event = new ClusterScaleTriggerEvent(selector, stackId,
                 hostGroupAdjustment.getHostGroup(), hostGroupAdjustment.getScalingAdjustment());
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
-    public void triggerClusterDownscale(Long stackId, HostGroupAdjustmentV4Request hostGroupAdjustment) {
+    public FlowStartResponse triggerClusterDownscale(Long stackId, HostGroupAdjustmentV4Request hostGroupAdjustment) {
         String selector = FlowChainTriggers.FULL_DOWNSCALE_TRIGGER_EVENT;
         ScalingType scalingType = hostGroupAdjustment.getWithStackUpdate() ? ScalingType.DOWNSCALE_TOGETHER : ScalingType.DOWNSCALE_ONLY_CLUSTER;
         Acceptable event = new ClusterAndStackDownscaleTriggerEvent(selector, stackId,
                 hostGroupAdjustment.getHostGroup(), hostGroupAdjustment.getScalingAdjustment(), scalingType);
-        notify(stackId, selector, event);
+        return notify(stackId, selector, event);
     }
 
-    public void triggerClusterStart(Long stackId) {
+    public FlowStartResponse triggerClusterStart(Long stackId) {
         String selector = CLUSTER_START_EVENT.event();
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
-    public void triggerClusterStop(Long stackId) {
+    public FlowStartResponse triggerClusterStop(Long stackId) {
         String selector = FlowChainTriggers.FULL_STOP_TRIGGER_EVENT;
-        notify(stackId, selector, new StackEvent(selector, stackId));
+        return notify(stackId, selector, new StackEvent(selector, stackId));
     }
 
     public void triggerClusterSync(Long stackId) {
@@ -257,19 +263,19 @@ public class ReactorFlowManager {
         notify(stackId, selector, new StackRepairTriggerEvent(stackId, unhealthyInstances));
     }
 
-    public void triggerClusterRepairFlow(Long stackId, Map<String, List<String>> failedNodesMap, boolean removeOnly) {
+    public FlowStartResponse triggerClusterRepairFlow(Long stackId, Map<String, List<String>> failedNodesMap, boolean removeOnly) {
         Stack stack = stackService.getByIdWithListsInTransaction(stackId);
-        notify(stackId, FlowChainTriggers.CLUSTER_REPAIR_TRIGGER_EVENT, new ClusterRepairTriggerEvent(stack, failedNodesMap, removeOnly));
+        return notify(stackId, FlowChainTriggers.CLUSTER_REPAIR_TRIGGER_EVENT, new ClusterRepairTriggerEvent(stack, failedNodesMap, removeOnly));
     }
 
-    public void triggerStackImageUpdate(Long stackId, String newImageId, String imageCatalogName, String imageCatalogUrl) {
+    public FlowStartResponse triggerStackImageUpdate(Long stackId, String newImageId, String imageCatalogName, String imageCatalogUrl) {
         String selector = FlowChainTriggers.STACK_IMAGE_UPDATE_TRIGGER_EVENT;
-        notify(stackId, selector, new StackImageUpdateTriggerEvent(selector, stackId, newImageId, imageCatalogName, imageCatalogUrl));
+        return notify(stackId, selector, new StackImageUpdateTriggerEvent(selector, stackId, newImageId, imageCatalogName, imageCatalogUrl));
     }
 
-    public void triggerMaintenanceModeValidationFlow(Long stackId) {
+    public FlowStartResponse triggerMaintenanceModeValidationFlow(Long stackId) {
         String selector = FlowChainTriggers.CLUSTER_MAINTENANCE_MODE_VALIDATION_TRIGGER_EVENT;
-        notify(stackId, selector, new MaintenanceModeValidationTriggerEvent(selector, stackId));
+        return notify(stackId, selector, new MaintenanceModeValidationTriggerEvent(selector, stackId));
     }
 
     public void cancelRunningFlows(Long resourceId) {
@@ -283,19 +289,21 @@ public class ReactorFlowManager {
     }
 
     @Async
-    public void triggerClusterTermination(Stack stack, boolean forced, String userCrn) {
+    public FlowStartResponse triggerClusterTermination(Stack stack, boolean forced, String userCrn) {
         MDCBuilder.buildMdcContext(stack);
-        ThreadBasedUserCrnProvider.doAs(userCrn, () -> {
+        FlowStartResponse flowStartResponse = ThreadBasedUserCrnProvider.doAs(userCrn, () -> {
             LOGGER.debug("Async termination flow trigger for stack: '{}', forced: '{}'", stack.getName(), forced);
             long startedAt = System.currentTimeMillis();
             Long stackId = stack.getId();
             boolean secure = isKerberosConfigAvailableForCluster(stack);
             String selector = secure ? FlowChainTriggers.PROPER_TERMINATION_TRIGGER_EVENT : FlowChainTriggers.TERMINATION_TRIGGER_EVENT;
-            notify(stackId, selector, new TerminationEvent(selector, stackId, forced));
+            FlowStartResponse response = notify(stackId, selector, new TerminationEvent(selector, stackId, forced));
             cancelRunningFlows(stackId);
             LOGGER.debug("Async termination flow trigger for stack: '{}' took '{}' ms", stack.getName(), System.currentTimeMillis() - startedAt);
+            return response;
         });
         MDCBuilder.cleanupMdc();
+        return flowStartResponse;
     }
 
     private boolean isKerberosConfigAvailableForCluster(Stack stack) {
@@ -308,15 +316,15 @@ public class ReactorFlowManager {
         return result;
     }
 
-    private void notify(Long stackId, String selector, Acceptable acceptable) {
-        notify(stackId, selector, acceptable, stackService::getByIdWithTransaction);
+    private FlowStartResponse notify(Long stackId, String selector, Acceptable acceptable) {
+        return notify(stackId, selector, acceptable, stackService::getByIdWithTransaction);
     }
 
-    private void notifyWithoutCheck(Long stackId, String selector, Acceptable acceptable) {
-        notify(stackId, selector, acceptable, stackService::getByIdWithTransaction);
+    private FlowStartResponse notifyWithoutCheck(Long stackId, String selector, Acceptable acceptable) {
+        return notify(stackId, selector, acceptable, stackService::getByIdWithTransaction);
     }
 
-    private void notify(Long stackId, String selector, Acceptable acceptable, Function<Long, Stack> getStackFn) {
+    private FlowStartResponse notify(Long stackId, String selector, Acceptable acceptable, Function<Long, Stack> getStackFn) {
         Event<Acceptable> event = eventFactory.createEventWithErrHandler(createEventParameters(stackId), acceptable);
 
         Stack stack = getStackFn.apply(event.getData().getResourceId());
@@ -336,6 +344,8 @@ public class ReactorFlowManager {
                 reactorReporter.logErrorReport();
                 throw new FlowsAlreadyRunningException(String.format("Stack %s has flows under operation, request not allowed.", stack.getName()));
             }
+            FlowLog flowLog = flowLogDBService.getLastFlowLogByResourceCrnOrName(stack.getName());
+            return FlowStartResponse.of(flowLog.getFlowId(), flowLog.getFlowChainId());
         } catch (InterruptedException e) {
             throw new CloudbreakApiException(e.getMessage());
         }

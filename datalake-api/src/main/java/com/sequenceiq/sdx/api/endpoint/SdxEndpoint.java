@@ -22,7 +22,7 @@ import com.sequenceiq.cloudbreak.jerseyclient.retry.RetryingRestClient;
 import com.sequenceiq.cloudbreak.validation.ValidCrn;
 import com.sequenceiq.cloudbreak.validation.ValidStackNameFormat;
 import com.sequenceiq.cloudbreak.validation.ValidStackNameLength;
-import com.sequenceiq.sdx.api.model.RedeploySdxClusterRequest;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.sdx.api.model.SdxClusterDetailResponse;
 import com.sequenceiq.sdx.api.model.SdxClusterRequest;
 import com.sequenceiq.sdx.api.model.SdxClusterResponse;
@@ -85,37 +85,25 @@ public interface SdxEndpoint {
     @Path("{name}")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "delete SDX cluster", produces = "application/json", nickname = "deleteSdx")
-    void delete(@PathParam("name") String name, @QueryParam("forced") @DefaultValue("false") Boolean forced);
+    FlowStartResponse delete(@PathParam("name") String name, @QueryParam("forced") @DefaultValue("false") Boolean forced);
 
     @DELETE
     @Path("/crn/{clusterCrn}")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "delete SDX cluster by crn", produces = "application/json", nickname = "deleteSdxByCrn")
-    void deleteByCrn(@PathParam("clusterCrn") String clusterCrn, @QueryParam("forced") @DefaultValue("false") Boolean forced);
-
-    @POST
-    @Path("{name}/redeploy")
-    @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation(value = "redeploy SDX cluster", produces = MediaType.APPLICATION_JSON, nickname = "redeploySdx")
-    void redeploy(@PathParam("name") String name, @Valid RedeploySdxClusterRequest redeploySdxClusterRequest);
-
-    @POST
-    @Path("/crn/{clusterCrn}/redeploy")
-    @Produces(MediaType.APPLICATION_JSON)
-    @ApiOperation(value = "redeploy SDX cluster by crn", produces = MediaType.APPLICATION_JSON, nickname = "redeploySdxByCrn")
-    void redeployByCrn(@PathParam("clusterCrn") String clusterCrn, @Valid RedeploySdxClusterRequest redeploySdxClusterRequest);
+    FlowStartResponse deleteByCrn(@PathParam("clusterCrn") String clusterCrn, @QueryParam("forced") @DefaultValue("false") Boolean forced);
 
     @POST
     @Path("{name}/manual_repair")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "repairs an sdxNode in the specified hostgroup", nickname = "repairSdxNode")
-    void repairCluster(@PathParam("name") String name, SdxRepairRequest clusterRepairRequest);
+    FlowStartResponse repairCluster(@PathParam("name") String name, SdxRepairRequest clusterRepairRequest);
 
     @POST
     @Path("/crn/{crn}/manual_repair")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "repairs an sdxNode in the specified hostgroup by crn", nickname = "repairSdxNodeByCrn")
-    void repairClusterByCrn(@PathParam("crn") String crn, SdxRepairRequest clusterRepairRequest);
+    FlowStartResponse repairClusterByCrn(@PathParam("crn") String crn, SdxRepairRequest clusterRepairRequest);
 
     @GET
     @Path("{name}/check_for_upgrade")
@@ -133,13 +121,13 @@ public interface SdxEndpoint {
     @Path("{name}/upgrade")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "upgrades the datalake cluster to the latest images", nickname = "upgradeDatalakeCluster")
-    void upgradeClusterByName(@PathParam("name") String name);
+    FlowStartResponse upgradeClusterByName(@PathParam("name") String name);
 
     @POST
     @Path("/crn/{crn}/upgrade")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "upgrades the datalake cluster to the latest images", nickname = "upgradeDatalakeClusterByCrn")
-    void upgradeClusterByCrn(@PathParam("crn") String crn);
+    FlowStartResponse upgradeClusterByCrn(@PathParam("crn") String crn);
 
     @POST
     @Path("{name}/sync")
@@ -157,35 +145,35 @@ public interface SdxEndpoint {
     @Path("{name}/retry")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "retry sdx", produces = MediaType.APPLICATION_JSON, nickname = "retrySdx")
-    void retry(@PathParam("name") String name);
+    FlowStartResponse retry(@PathParam("name") String name);
 
     @POST
     @Path("/crn/{crn}/retry")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "retry sdx by crn", produces = MediaType.APPLICATION_JSON, nickname = "retrySdxByCrn")
-    void retryByCrn(@PathParam("crn") String crn);
+    FlowStartResponse retryByCrn(@PathParam("crn") String crn);
 
     @POST
     @Path("{name}/start")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "start sdx", produces = MediaType.APPLICATION_JSON, nickname = "startSdxByName")
-    void startByName(@PathParam("name") String name);
+    FlowStartResponse startByName(@PathParam("name") String name);
 
     @POST
     @Path("/crn/{crn}/start")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "start sdx by crn", produces = MediaType.APPLICATION_JSON, nickname = "startSdxByCrn")
-    void startByCrn(@PathParam("crn") String crn);
+    FlowStartResponse startByCrn(@PathParam("crn") String crn);
 
     @POST
     @Path("{name}/stop")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "stop sdx", produces = MediaType.APPLICATION_JSON, nickname = "stopSdxByName")
-    void stopByName(@PathParam("name") String name);
+    FlowStartResponse stopByName(@PathParam("name") String name);
 
     @POST
     @Path("/crn/{crn}/stop")
     @Produces(MediaType.APPLICATION_JSON)
     @ApiOperation(value = "stop sdx by crn", produces = MediaType.APPLICATION_JSON, nickname = "stopSdxByCrn")
-    void stopByCrn(@PathParam("crn") String crn);
+    FlowStartResponse stopByCrn(@PathParam("crn") String crn);
 }

@@ -110,6 +110,7 @@ public class Flow2Handler implements Consumer<Event<? extends Payload>> {
                         Flow flow = flowConfig.createFlow(flowId, payload.getResourceId());
                         flow.initialize(contextParams);
                         flowLogService.save(flowParameters, flowChainId, key, payload, null, flowConfig.getClass(), flow.getCurrentState());
+
                         acceptFlow(payload);
                         logFlowId(flowId);
                         runningFlows.put(flow, flowChainId);

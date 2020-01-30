@@ -31,6 +31,7 @@ import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.response.UpgradeOptionV4
 import com.sequenceiq.cloudbreak.domain.stack.Stack;
 import com.sequenceiq.cloudbreak.workspace.controller.WorkspaceEntityType;
 import com.sequenceiq.distrox.v1.distrox.StackOperations;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 
 @Controller
 @WorkspaceEntityType(Stack.class)
@@ -62,8 +63,8 @@ public class StackV4Controller extends NotificationController implements StackV4
     }
 
     @Override
-    public void delete(Long workspaceId, String name, boolean forced) {
-        stackOperations.delete(NameOrCrn.ofName(name), workspaceId, forced);
+    public FlowStartResponse delete(Long workspaceId, String name, boolean forced) {
+        return stackOperations.delete(NameOrCrn.ofName(name), workspaceId, forced);
     }
 
     @Override
@@ -72,8 +73,8 @@ public class StackV4Controller extends NotificationController implements StackV4
     }
 
     @Override
-    public void retry(Long workspaceId, String name) {
-        stackOperations.retry(NameOrCrn.ofName(name), workspaceId);
+    public FlowStartResponse retry(Long workspaceId, String name) {
+        return stackOperations.retry(NameOrCrn.ofName(name), workspaceId);
     }
 
     @Override
@@ -84,28 +85,28 @@ public class StackV4Controller extends NotificationController implements StackV4
     }
 
     @Override
-    public void putStop(Long workspaceId, String name) {
-        stackOperations.putStop(NameOrCrn.ofName(name), workspaceId);
+    public FlowStartResponse putStop(Long workspaceId, String name) {
+        return stackOperations.putStop(NameOrCrn.ofName(name), workspaceId);
     }
 
     @Override
-    public void putStart(Long workspaceId, String name) {
-        stackOperations.putStart(NameOrCrn.ofName(name), workspaceId);
+    public FlowStartResponse putStart(Long workspaceId, String name) {
+        return stackOperations.putStart(NameOrCrn.ofName(name), workspaceId);
     }
 
     @Override
-    public void putScaling(Long workspaceId, String name, @Valid StackScaleV4Request updateRequest) {
-        stackOperations.putScaling(NameOrCrn.ofName(name), workspaceId, updateRequest);
+    public FlowStartResponse putScaling(Long workspaceId, String name, @Valid StackScaleV4Request updateRequest) {
+        return stackOperations.putScaling(NameOrCrn.ofName(name), workspaceId, updateRequest);
     }
 
     @Override
-    public void repairCluster(Long workspaceId, String name, @Valid ClusterRepairV4Request clusterRepairRequest) {
-        stackOperations.repairCluster(NameOrCrn.ofName(name), workspaceId, clusterRepairRequest);
+    public FlowStartResponse repairCluster(Long workspaceId, String name, @Valid ClusterRepairV4Request clusterRepairRequest) {
+        return stackOperations.repairCluster(NameOrCrn.ofName(name), workspaceId, clusterRepairRequest);
     }
 
     @Override
-    public void upgradeCluster(Long workspaceId, String name) {
-        stackOperations.upgradeCluster(NameOrCrn.ofName(name), workspaceId);
+    public FlowStartResponse upgradeCluster(Long workspaceId, String name) {
+        return stackOperations.upgradeCluster(NameOrCrn.ofName(name), workspaceId);
     }
 
     @Override
@@ -119,13 +120,13 @@ public class StackV4Controller extends NotificationController implements StackV4
     }
 
     @Override
-    public void changeImage(Long workspaceId, String name, @Valid StackImageChangeV4Request stackImageChangeRequest) {
-        stackOperations.changeImage(NameOrCrn.ofName(name), workspaceId, stackImageChangeRequest);
+    public FlowStartResponse changeImage(Long workspaceId, String name, @Valid StackImageChangeV4Request stackImageChangeRequest) {
+        return stackOperations.changeImage(NameOrCrn.ofName(name), workspaceId, stackImageChangeRequest);
     }
 
     @Override
-    public void deleteWithKerberos(Long workspaceId, String name, boolean forced) {
-        stackOperations.delete(NameOrCrn.ofName(name), workspaceId, forced);
+    public FlowStartResponse deleteWithKerberos(Long workspaceId, String name, boolean forced) {
+        return stackOperations.delete(NameOrCrn.ofName(name), workspaceId, forced);
     }
 
     @Override
@@ -139,28 +140,28 @@ public class StackV4Controller extends NotificationController implements StackV4
     }
 
     @Override
-    public void deleteInstance(Long workspaceId, String name, boolean forced, String instanceId) {
-        stackOperations.deleteInstance(NameOrCrn.ofName(name), workspaceId, forced, instanceId);
+    public FlowStartResponse deleteInstance(Long workspaceId, String name, boolean forced, String instanceId) {
+        return stackOperations.deleteInstance(NameOrCrn.ofName(name), workspaceId, forced, instanceId);
     }
 
     @Override
-    public void deleteMultipleInstances(Long workspaceId, String name, List<String> instanceIds, boolean forced) {
-        stackOperations.deleteInstances(NameOrCrn.ofName(name), workspaceId, instanceIds, forced);
+    public FlowStartResponse deleteMultipleInstances(Long workspaceId, String name, List<String> instanceIds, boolean forced) {
+        return stackOperations.deleteInstances(NameOrCrn.ofName(name), workspaceId, instanceIds, forced);
     }
 
     @Override
-    public void putPassword(Long workspaceId, String name, @Valid UserNamePasswordV4Request userNamePasswordJson) {
-        stackOperations.putPassword(NameOrCrn.ofName(name), workspaceId, userNamePasswordJson);
+    public FlowStartResponse putPassword(Long workspaceId, String name, @Valid UserNamePasswordV4Request userNamePasswordJson) {
+        return stackOperations.putPassword(NameOrCrn.ofName(name), workspaceId, userNamePasswordJson);
     }
 
     @Override
-    public void setClusterMaintenanceMode(Long workspaceId, String name, @NotNull MaintenanceModeV4Request maintenanceMode) {
-        stackOperations.setClusterMaintenanceMode(NameOrCrn.ofName(name), workspaceId, maintenanceMode);
+    public FlowStartResponse setClusterMaintenanceMode(Long workspaceId, String name, @NotNull MaintenanceModeV4Request maintenanceMode) {
+        return stackOperations.setClusterMaintenanceMode(NameOrCrn.ofName(name), workspaceId, maintenanceMode);
     }
 
     @Override
-    public void putCluster(Long workspaceId, String name, @Valid UpdateClusterV4Request updateJson) {
-        stackOperations.putCluster(NameOrCrn.ofName(name), workspaceId, updateJson);
+    public FlowStartResponse putCluster(Long workspaceId, String name, @Valid UpdateClusterV4Request updateJson) {
+        return stackOperations.putCluster(NameOrCrn.ofName(name), workspaceId, updateJson);
     }
 
     @Override

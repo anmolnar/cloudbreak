@@ -14,7 +14,7 @@ public class SdxClusterDetailResponse extends SdxClusterResponse {
                 sdxClusterResponse.getStatusReason(), sdxClusterResponse.getEnvironmentName(),
                 sdxClusterResponse.getEnvironmentCrn(), sdxClusterResponse.getStackCrn(),
                 sdxClusterResponse.getClusterShape(),
-                sdxClusterResponse.getCloudStorageBaseLocation(), sdxClusterResponse.getCloudStorageFileSystemType());
+                sdxClusterResponse.getCloudStorageBaseLocation(), sdxClusterResponse.getCloudStorageFileSystemType(), null);
         this.stackV4Response = stackV4Response;
     }
 

@@ -1,5 +1,38 @@
 package com.sequenceiq.cloudbreak.service.stack;
 
+import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.AVAILABLE;
+import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.DELETE_IN_PROGRESS;
+import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.STOPPED;
+import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.STOP_REQUESTED;
+import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_START_IGNORED;
+import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_STOP_IGNORED;
+import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_STOP_REQUESTED;
+import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
+import static com.sequenceiq.cloudbreak.util.Benchmark.measure;
+
+import java.io.IOException;
+import java.time.Duration;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import javax.inject.Inject;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.stereotype.Service;
+
 import com.cedarsoftware.util.io.JsonReader;
 import com.google.api.client.repackaged.com.google.common.base.Strings;
 import com.sequenceiq.authorization.resource.AuthorizationResource;
@@ -82,40 +115,10 @@ import com.sequenceiq.cloudbreak.workspace.model.Tenant;
 import com.sequenceiq.cloudbreak.workspace.model.User;
 import com.sequenceiq.cloudbreak.workspace.model.Workspace;
 import com.sequenceiq.common.api.telemetry.model.Telemetry;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.core.FlowLogService;
 import com.sequenceiq.flow.core.ResourceIdProvider;
 import com.sequenceiq.flow.domain.FlowLog;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.stereotype.Service;
-
-import javax.inject.Inject;
-import java.io.IOException;
-import java.time.Duration;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.AVAILABLE;
-import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.DELETE_IN_PROGRESS;
-import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.STOPPED;
-import static com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status.STOP_REQUESTED;
-import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_START_IGNORED;
-import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_STOP_IGNORED;
-import static com.sequenceiq.cloudbreak.event.ResourceEvent.STACK_STOP_REQUESTED;
-import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
-import static com.sequenceiq.cloudbreak.util.Benchmark.measure;
 
 @Service
 public class StackService implements ResourceIdProvider {
@@ -547,21 +550,21 @@ public class StackService implements ResourceIdProvider {
         }).orElseThrow(notFound("Stack", crn));
     }
 
-    public void removeInstance(Stack stack, Long workspaceId, String instanceId, boolean forced, User user) {
+    public FlowStartResponse removeInstance(Stack stack, Long workspaceId, String instanceId, boolean forced, User user) {
         InstanceMetaData metaData = validateInstanceForDownscale(instanceId, stack, workspaceId, user);
-        flowManager.triggerStackRemoveInstance(stack.getId(), metaData.getInstanceGroupName(), metaData.getPrivateId(), forced);
+        return flowManager.triggerStackRemoveInstance(stack.getId(), metaData.getInstanceGroupName(), metaData.getPrivateId(), forced);
     }
 
-    public void removeInstances(Stack stack, Long workspaceId, Collection<String> instanceIds, boolean forced, User user) {
+    public FlowStartResponse removeInstances(Stack stack, Long workspaceId, Collection<String> instanceIds, boolean forced, User user) {
         Map<String, Set<Long>> instanceIdsByHostgroupMap = new HashMap<>();
         for (String instanceId : instanceIds) {
             InstanceMetaData metaData = validateInstanceForDownscale(instanceId, stack, workspaceId, user);
             instanceIdsByHostgroupMap.computeIfAbsent(metaData.getInstanceGroupName(), s -> new LinkedHashSet<>()).add(metaData.getPrivateId());
         }
-        flowManager.triggerStackRemoveInstances(stack.getId(), instanceIdsByHostgroupMap, forced);
+        return flowManager.triggerStackRemoveInstances(stack.getId(), instanceIdsByHostgroupMap, forced);
     }
 
-    public void updateStatus(Long stackId, StatusRequest status, boolean updateCluster, User user) {
+    public FlowStartResponse updateStatus(Long stackId, StatusRequest status, boolean updateCluster, User user) {
         Stack stack = getByIdWithLists(stackId);
         Cluster cluster = null;
         if (stack.getCluster() != null) {
@@ -578,14 +581,13 @@ public class StackService implements ResourceIdProvider {
                 repairFailedNodes(stack, user);
                 break;
             case STOPPED:
-                stop(stack, cluster, updateCluster, user);
-                break;
+                return stop(stack, cluster, updateCluster, user);
             case STARTED:
-                start(stack, cluster, updateCluster, user);
-                break;
+                return start(stack, cluster, updateCluster, user);
             default:
                 throw new BadRequestException("Cannot update the status of stack because status request not valid.");
         }
+        return FlowStartResponse.IMMEDIATE;
     }
 
     Optional<Stack> findTemplateWithLists(Long id) {
@@ -647,9 +649,9 @@ public class StackService implements ResourceIdProvider {
         return stackRepository.findByNetwork(network);
     }
 
-    public void updateImage(Long stackId, Long workspaceId, String imageId, String imageCatalogName, String imageCatalogUrl, User user) {
+    public FlowStartResponse updateImage(Long stackId, Long workspaceId, String imageId, String imageCatalogName, String imageCatalogUrl, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
-        flowManager.triggerStackImageUpdate(stackId, imageId, imageCatalogName, imageCatalogUrl);
+        return flowManager.triggerStackImageUpdate(stackId, imageId, imageCatalogName, imageCatalogUrl);
     }
 
     @Override
@@ -720,18 +722,19 @@ public class StackService implements ResourceIdProvider {
         }
     }
 
-    private void stop(Stack stack, Cluster cluster, boolean updateCluster, User user) {
+    private FlowStartResponse stop(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         if (cluster != null && cluster.isStopInProgress()) {
             setStackStatusToStopRequested(stack);
+            return FlowStartResponse.IMMEDIATE;
         } else {
-            triggerStackStopIfNeeded(stack, cluster, updateCluster, user);
+            return triggerStackStopIfNeeded(stack, cluster, updateCluster, user);
         }
     }
 
-    private void triggerStackStopIfNeeded(Stack stack, Cluster cluster, boolean updateCluster, User user) {
+    private FlowStartResponse triggerStackStopIfNeeded(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
         if (!isStopNeeded(stack)) {
-            return;
+            return FlowStartResponse.IMMEDIATE;
         }
         if (cluster != null && !cluster.isStopped() && !stack.isStopFailed()) {
             if (!updateCluster) {
@@ -740,13 +743,14 @@ public class StackService implements ResourceIdProvider {
             } else if (cluster.isClusterReadyForStop() || cluster.isStopFailed()) {
                 setStackStatusToStopRequested(stack);
                 clusterService.updateStatus(stack.getId(), StatusRequest.STOPPED);
+                return FlowStartResponse.IMMEDIATE;
             } else {
                 throw new BadRequestException(String.format("Cannot update the status of cluster '%s' to STOPPED, because the cluster's state is %s.",
                         cluster.getName(), cluster.getStatus()));
             }
         } else {
             stackUpdater.updateStackStatus(stack.getId(), DetailedStackStatus.STOP_REQUESTED);
-            flowManager.triggerStackStop(stack.getId());
+            return flowManager.triggerStackStop(stack.getId());
         }
     }
 
@@ -771,8 +775,9 @@ public class StackService implements ResourceIdProvider {
         eventService.fireCloudbreakEvent(stack.getId(), STOP_REQUESTED.name(), STACK_STOP_REQUESTED);
     }
 
-    private void start(Stack stack, Cluster cluster, boolean updateCluster, User user) {
+    private FlowStartResponse start(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
+        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
         if (stack.isAvailable()) {
             eventService.fireCloudbreakEvent(stack.getId(), AVAILABLE.name(), STACK_START_IGNORED);
         } else if ((!stack.isStopped() || (cluster != null && !cluster.isStopped())) && !stack.isStartFailed()) {
@@ -780,17 +785,18 @@ public class StackService implements ResourceIdProvider {
                     String.format("Cannot update the status of stack '%s' to STARTED, because it isn't in STOPPED state.", stack.getName()));
         } else if (stack.isStopped() || stack.isStartFailed()) {
             Stack startStack = stackUpdater.updateStackStatus(stack.getId(), DetailedStackStatus.START_REQUESTED);
-            flowManager.triggerStackStart(stack.getId());
+            flowStartResponse = flowManager.triggerStackStart(stack.getId());
             if (updateCluster && cluster != null) {
                 clusterService.updateStatus(startStack, StatusRequest.STARTED);
             }
         }
+        return flowStartResponse;
     }
 
-    public void updateNodeCount(Stack stack, InstanceGroupAdjustmentV4Request instanceGroupAdjustmentJson, boolean withClusterEvent, User user) {
+    public FlowStartResponse updateNodeCount(Stack stack, InstanceGroupAdjustmentV4Request instanceGroupAdjustmentJson, boolean withClusterEvent, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
         try {
-            transactionService.required(() -> {
+            return transactionService.required(() -> {
                 Stack stackWithLists = getByIdWithLists(stack.getId());
                 validateStackStatus(stackWithLists);
                 validateInstanceGroup(stackWithLists, instanceGroupAdjustmentJson.getInstanceGroup());
@@ -803,12 +809,11 @@ public class StackService implements ResourceIdProvider {
                 }
                 if (instanceGroupAdjustmentJson.getScalingAdjustment() > 0) {
                     stackUpdater.updateStackStatus(stackWithLists.getId(), DetailedStackStatus.UPSCALE_REQUESTED);
-                    flowManager.triggerStackUpscale(stackWithLists.getId(), instanceGroupAdjustmentJson, withClusterEvent);
+                    return flowManager.triggerStackUpscale(stackWithLists.getId(), instanceGroupAdjustmentJson, withClusterEvent);
                 } else {
                     stackUpdater.updateStackStatus(stackWithLists.getId(), DetailedStackStatus.DOWNSCALE_REQUESTED);
-                    flowManager.triggerStackDownscale(stackWithLists.getId(), instanceGroupAdjustmentJson);
+                    return flowManager.triggerStackDownscale(stackWithLists.getId(), instanceGroupAdjustmentJson);
                 }
-                return null;
             });
         } catch (TransactionExecutionException e) {
             if (e.getCause() instanceof BadRequestException) {
