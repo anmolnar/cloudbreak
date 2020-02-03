@@ -1,5 +1,17 @@
 package com.sequenceiq.distrox.v1.distrox.converter;
 
+import static com.sequenceiq.cloudbreak.util.NullUtil.getIfNotNull;
+
+import java.util.Map;
+import java.util.Optional;
+
+import javax.inject.Inject;
+
+import org.apache.commons.lang3.tuple.ImmutablePair;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
 import com.sequenceiq.cloudbreak.api.endpoint.v4.common.StackType;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.base.parameter.stack.YarnStackV4Parameters;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.request.StackV4Request;
@@ -22,16 +34,6 @@ import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentB
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentNetworkResponse;
 import com.sequenceiq.environment.api.v1.environment.model.response.EnvironmentStatus;
 import com.sequenceiq.sdx.api.model.SdxClusterResponse;
-import org.apache.commons.lang3.tuple.ImmutablePair;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Component;
-
-import javax.inject.Inject;
-import java.util.Map;
-import java.util.Optional;
-
-import static com.sequenceiq.cloudbreak.util.NullUtil.getIfNotNull;
 
 @Component
 public class DistroXV1RequestToStackV4RequestConverter {
@@ -68,6 +70,9 @@ public class DistroXV1RequestToStackV4RequestConverter {
     @Inject
     private SdxClientService sdxClientService;
 
+    @Inject
+    private DistroXDatabaseRequestToStackDatabaseRequestConverter databaseRequestConverter;
+
     public StackV4Request convert(DistroXV1Request source) {
         DetailedEnvironmentResponse environment = Optional.ofNullable(environmentClientService.getByName(source.getEnvironmentName()))
                 .orElseThrow(() -> new BadRequestException("No environment name provided hence unable to obtain some important data"));
@@ -96,6 +101,7 @@ public class DistroXV1RequestToStackV4RequestConverter {
         request.setTimeToLive(source.getTimeToLive());
         request.setTelemetry(getTelemetryRequest(source, environment, sdxClusterResponse));
         request.setGatewayPort(source.getGatewayPort());
+        request.setExternalDatabase(getIfNotNull(source.getExternalDatabase(), databaseRequestConverter::convert));
         return request;
     }
 
@@ -130,6 +136,7 @@ public class DistroXV1RequestToStackV4RequestConverter {
         request.setSharedService(getIfNotNull(sdxClusterResponse, sdx -> sdxConverter.getSharedServiceV4Request(sdx.getName())));
         request.setTimeToLive(source.getTimeToLive());
         request.setTelemetry(getTelemetryRequest(source, environment, sdxClusterResponse));
+        request.setExternalDatabase(getIfNotNull(source.getExternalDatabase(), databaseRequestConverter::convert));
         return request;
     }
 
@@ -199,6 +206,7 @@ public class DistroXV1RequestToStackV4RequestConverter {
         request.setTags(getIfNotNull(source.getTags(), this::getTags));
         request.setSdx(getIfNotNull(source.getSharedService(), sdxConverter::getSdx));
         request.setGatewayPort(source.getGatewayPort());
+        request.setExternalDatabase(getIfNotNull(source.getExternalDatabase(), databaseRequestConverter::convert));
         return request;
     }
 
