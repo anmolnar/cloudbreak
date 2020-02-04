@@ -123,6 +123,9 @@ public class StackV4Response extends StackV4Base implements Pollable {
     @ApiModelProperty(StackModelDescription.TUNNEL)
     private Tunnel tunnel = Tunnel.DIRECT;
 
+    @ApiModelProperty(StackModelDescription.FLOW_ID)
+    private String flowId;
+
     @ApiModelProperty(StackModelDescription.FLOW_CHAIN_ID)
     private String flowChainId;
 
@@ -348,6 +351,15 @@ public class StackV4Response extends StackV4Base implements Pollable {
 
     public void setTunnel(Tunnel tunnel) {
         this.tunnel = tunnel;
+    }
+
+    @Override
+    public String getFlowId() {
+        return flowId;
+    }
+
+    public void setFlowId(String flowId) {
+        this.flowId = flowId;
     }
 
     @Override

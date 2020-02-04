@@ -29,6 +29,8 @@ public class SdxClusterResponse implements Pollable {
 
     private FileSystemType cloudStorageFileSystemType;
 
+    private String flowId;
+
     private String flowChainId;
 
     public SdxClusterResponse() {
@@ -37,8 +39,7 @@ public class SdxClusterResponse implements Pollable {
     public SdxClusterResponse(String crn, String name, SdxClusterStatusResponse status,
             String statusReason, String environmentName, String environmentCrn, String stackCrn,
             SdxClusterShape clusterShape,
-            String cloudStorageBaseLocation, FileSystemType cloudStorageFileSystemType,
-            String flowChainId) {
+            String cloudStorageBaseLocation, FileSystemType cloudStorageFileSystemType) {
         this.crn = crn;
         this.name = name;
         this.status = status;
@@ -49,7 +50,6 @@ public class SdxClusterResponse implements Pollable {
         this.clusterShape = clusterShape;
         this.cloudStorageBaseLocation = cloudStorageBaseLocation;
         this.cloudStorageFileSystemType = cloudStorageFileSystemType;
-        this.flowChainId = flowChainId;
     }
 
     public String getCrn() {
@@ -146,6 +146,15 @@ public class SdxClusterResponse implements Pollable {
 
     public void setCloudStorageFileSystemType(FileSystemType cloudStorageFileSystemType) {
         this.cloudStorageFileSystemType = cloudStorageFileSystemType;
+    }
+
+    @Override
+    public String getFlowId() {
+        return flowId;
+    }
+
+    public void setFlowId(String flowId) {
+        this.flowId = flowId;
     }
 
     @Override
