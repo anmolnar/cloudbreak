@@ -9,6 +9,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.internal.verification.VerificationModeFactory.times;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.assertj.core.util.Lists;
 import org.junit.Test;
@@ -36,7 +37,8 @@ public class FlowChainLogServiceTest {
         when(flowLogRepository.findByParentFlowChainIdOrderByCreatedDesc(eq(flowChainId))).thenReturn(Lists.newArrayList(create("anotherFlowChainId")));
         when(flowLogRepository.findByParentFlowChainIdOrderByCreatedDesc(eq(parentFlowChainId))).thenReturn(Lists.newArrayList());
 
-        List<String> flowChainIds = underTest.collectRelatedFlowChainIds(Lists.newArrayList(), flowChainId);
+        List<FlowChainLog> flowChains = underTest.collectRelatedFlowChains(Lists.newArrayList(), create(flowChainId));
+        List<String> flowChainIds = flowChains.stream().map(flowChainLog -> flowChainLog.getFlowChainId()).collect(Collectors.toList());
 
         assertEquals(2, flowChainIds.size());
         assertTrue(flowChainIds.contains(flowChainId));

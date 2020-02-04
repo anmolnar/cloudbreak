@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.ws.rs.BadRequestException;
+import javax.ws.rs.NotFoundException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,7 +19,9 @@ import org.springframework.stereotype.Controller;
 import com.google.api.client.util.Lists;
 import com.sequenceiq.cloudbreak.auth.altus.Crn;
 import com.sequenceiq.flow.api.FlowEndpoint;
+import com.sequenceiq.flow.api.model.FlowCheckResponse;
 import com.sequenceiq.flow.api.model.FlowLogResponse;
+import com.sequenceiq.flow.domain.FlowChainLog;
 import com.sequenceiq.flow.domain.FlowLog;
 import com.sequenceiq.flow.service.flowlog.FlowChainLogService;
 import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
@@ -81,8 +84,29 @@ public class FlowController implements FlowEndpoint {
 
     @Override
     public List<FlowLogResponse> getFlowLogsByResourceNameAndChainId(String resourceName, String chainId) {
-        List<String> relatedChainIds = flowChainLogService.collectRelatedFlowChainIds(Lists.newArrayList(), chainId);
-        List<FlowLog> flowLogs = flowLogDBService.getFlowLogsByResourceAndChainId(resourceName, relatedChainIds);
-        return flowLogs.stream().map(flowLog -> conversionService.convert(flowLog, FlowLogResponse.class)).collect(Collectors.toList());
+        Optional<FlowChainLog> firstByFlowChainIdOrderByCreatedDesc = flowChainLogService.findFirstByFlowChainIdOrderByCreatedDesc(chainId);
+        if (firstByFlowChainIdOrderByCreatedDesc.isPresent()) {
+            List<FlowChainLog> relatedChains = flowChainLogService.collectRelatedFlowChains(Lists.newArrayList(), firstByFlowChainIdOrderByCreatedDesc.get());
+            List<FlowLog> flowLogs = flowLogDBService.getFlowLogsByResourceAndChainId(resourceName,
+                    relatedChains.stream().map(flowChainLog -> flowChainLog.getFlowChainId()).collect(Collectors.toList()));
+            return flowLogs.stream().map(flowLog -> conversionService.convert(flowLog, FlowLogResponse.class)).collect(Collectors.toList());
+        }
+        throw new NotFoundException("FlowChain not found by this flowChainId!");
+    }
+
+    @Override
+    public FlowCheckResponse hasFlowRunning(String resourceName, String chainId) {
+        Optional<FlowChainLog> firstByFlowChainIdOrderByCreatedDesc = flowChainLogService.findFirstByFlowChainIdOrderByCreatedDesc(chainId);
+        if (firstByFlowChainIdOrderByCreatedDesc.isPresent()) {
+            List<FlowChainLog> relatedChains = flowChainLogService.collectRelatedFlowChains(Lists.newArrayList(), firstByFlowChainIdOrderByCreatedDesc.get());
+            List<FlowLog> relatedFlowLogs = flowLogDBService.getFlowLogsByResourceAndChainId(resourceName,
+                    relatedChains.stream().map(flowChainLog -> flowChainLog.getFlowChainId()).collect(Collectors.toList()));
+            FlowCheckResponse flowCheckResponse = new FlowCheckResponse();
+            flowCheckResponse.setFlowChainId(chainId);
+            flowCheckResponse.setHasActiveFlow(flowChainLogService.checkIfAnyFlowChainHasEventInQueue(relatedChains) ||
+                    flowLogDBService.hasPendingFlowEvent(relatedFlowLogs));
+            return flowCheckResponse;
+        }
+        throw new NotFoundException("FlowChain not found by this flowChainId!");
     }
 }
