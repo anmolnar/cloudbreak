@@ -50,6 +50,12 @@ public class EncryptedImageCopyService {
 
     static final String AMI_NOT_FOUND_MSG_CODE = "InvalidAMIID.NotFound";
 
+    static final int POLLING_INTERVAL = 5000;
+
+    static final int MAX_POLLING_ATTEMPT = 5000;
+
+    static final int FAILURE_TOLERANT_ATTEMPT = 100;
+
     private static final String ENCRYPTED_AMI_NAME_PATTERN = "encrypted-cb-%s-%s";
 
     private static final String ENCRYPTED_AMI_DESCRIPTION = "Encrypted AMI for Cloudbreak root volume in an encrypted hostgroup.";
@@ -79,7 +85,9 @@ public class EncryptedImageCopyService {
         if (!imageIdByGroupName.isEmpty()) {
             Collection<String> imageIds = new HashSet<>(imageIdByGroupName.values());
             LOGGER.debug("Start polling the availability of the created AMIs: '{}'", String.join(",", imageIds));
-            checkBooleanPollTask(awsPollTaskFactory.newAMICopyStatusCheckerTask(ac, imageIds, client));
+            AmazonEC2Client clientWithNoRetry = awsClient.createAccess(awsCredentialView, regionName);
+            clientWithNoRetry.getClientConfiguration().setMaxErrorRetry(0);
+            checkBooleanPollTask(awsPollTaskFactory.newAMICopyStatusCheckerTask(ac, imageIds, clientWithNoRetry));
         }
         return imageIdByGroupName;
     }
@@ -151,7 +159,8 @@ public class EncryptedImageCopyService {
         try {
             Boolean statePollerResult = booleanPollTask.call();
             if (!booleanPollTask.completed(statePollerResult)) {
-                syncPollingScheduler.schedule(booleanPollTask);
+                // Poll interval to 5s from default 1s. Tolerate all the failures for 10m. The default is 3 failures.
+                syncPollingScheduler.schedule(booleanPollTask, POLLING_INTERVAL, MAX_POLLING_ATTEMPT, FAILURE_TOLERANT_ATTEMPT);
             }
         } catch (Exception e) {
             throw new CloudConnectorException(e.getMessage(), e);

@@ -1,13 +1,16 @@
 package com.sequenceiq.cloudbreak.cloud.aws.encryption;
 
-import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.AMI_NOT_FOUND_MSG_CODE;
-import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.SNAPSHOT_NOT_FOUND_MSG_CODE;
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.POLLING_INTERVAL;
+import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.MAX_POLLING_ATTEMPT;
+import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.FAILURE_TOLERANT_ATTEMPT;
+import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.AMI_NOT_FOUND_MSG_CODE;
+import static com.sequenceiq.cloudbreak.cloud.aws.encryption.EncryptedImageCopyService.SNAPSHOT_NOT_FOUND_MSG_CODE;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +19,7 @@ import java.util.Optional;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
 
+import com.amazonaws.ClientConfiguration;
 import org.junit.Assert;
 import org.junit.Before;
 import org.junit.Rule;
@@ -127,6 +131,7 @@ public class EncryptedImageCopyServiceTest {
 
         String encryptedImageId = "ami-87654321";
         when(ec2Client.copyImage(any())).thenReturn(new CopyImageResult().withImageId(encryptedImageId));
+        when(ec2Client.getClientConfiguration()).thenReturn(new ClientConfiguration());
 
         when(awsPollTaskFactory.newAMICopyStatusCheckerTask(any(), any(), any())).thenReturn(amiCopyStatusCheckerTask);
         when(amiCopyStatusCheckerTask.call()).thenReturn(false);
@@ -135,7 +140,7 @@ public class EncryptedImageCopyServiceTest {
 
         verify(ec2Client, times(1)).copyImage(any());
         verify(resourceNotifier, times(1)).notifyAllocation(any(), any());
-        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask);
+        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask, POLLING_INTERVAL, MAX_POLLING_ATTEMPT, FAILURE_TOLERANT_ATTEMPT);
         Assert.assertEquals(encryptedImages.size(), 2);
         Assert.assertTrue(encryptedImages.values().stream().allMatch(el -> el.equals(encryptedImageId)));
     }
@@ -153,6 +158,7 @@ public class EncryptedImageCopyServiceTest {
 
         String encryptedImageId = "ami-87654321";
         when(ec2Client.copyImage(any())).thenReturn(new CopyImageResult().withImageId(encryptedImageId));
+        when(ec2Client.getClientConfiguration()).thenReturn(new ClientConfiguration());
 
         when(awsPollTaskFactory.newAMICopyStatusCheckerTask(any(), any(), any())).thenReturn(amiCopyStatusCheckerTask);
         when(amiCopyStatusCheckerTask.call()).thenReturn(false);
@@ -161,7 +167,7 @@ public class EncryptedImageCopyServiceTest {
 
         verify(ec2Client, times(1)).copyImage(any());
         verify(resourceNotifier, times(1)).notifyAllocation(any(), any());
-        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask);
+        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask, POLLING_INTERVAL, MAX_POLLING_ATTEMPT, FAILURE_TOLERANT_ATTEMPT);
         Assert.assertEquals(encryptedImages.size(), 2);
         Assert.assertTrue(encryptedImages.values().stream().allMatch(el -> el.equals(encryptedImageId)));
     }
@@ -188,6 +194,7 @@ public class EncryptedImageCopyServiceTest {
         when(ec2Client.copyImage(any()))
                 .thenReturn(new CopyImageResult().withImageId(encryptedImageId))
                 .thenReturn(new CopyImageResult().withImageId(secondEncryptedImageId));
+        when(ec2Client.getClientConfiguration()).thenReturn(new ClientConfiguration());
 
         when(awsPollTaskFactory.newAMICopyStatusCheckerTask(any(), any(), any())).thenReturn(amiCopyStatusCheckerTask);
         when(amiCopyStatusCheckerTask.call()).thenReturn(false);
@@ -196,7 +203,7 @@ public class EncryptedImageCopyServiceTest {
 
         verify(ec2Client, times(2)).copyImage(any());
         verify(resourceNotifier, times(2)).notifyAllocation(any(), any());
-        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask);
+        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask, POLLING_INTERVAL, MAX_POLLING_ATTEMPT, FAILURE_TOLERANT_ATTEMPT);
         Assert.assertEquals(encryptedImages.size(), 2);
         Assert.assertTrue(encryptedImages.containsValue(encryptedImageId));
         Assert.assertTrue(encryptedImages.containsValue(secondEncryptedImageId));
@@ -229,6 +236,7 @@ public class EncryptedImageCopyServiceTest {
         when(ec2Client.copyImage(any()))
                 .thenReturn(new CopyImageResult().withImageId(encryptedImageId))
                 .thenReturn(new CopyImageResult().withImageId(secondEncryptedImageId));
+        when(ec2Client.getClientConfiguration()).thenReturn(new ClientConfiguration());
 
         when(awsPollTaskFactory.newAMICopyStatusCheckerTask(any(), any(), any())).thenReturn(amiCopyStatusCheckerTask);
         when(amiCopyStatusCheckerTask.call()).thenReturn(false);
@@ -237,7 +245,7 @@ public class EncryptedImageCopyServiceTest {
 
         verify(ec2Client, times(2)).copyImage(any());
         verify(resourceNotifier, times(2)).notifyAllocation(any(), any());
-        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask);
+        verify(syncPollingScheduler, times(1)).schedule(amiCopyStatusCheckerTask, POLLING_INTERVAL, MAX_POLLING_ATTEMPT, FAILURE_TOLERANT_ATTEMPT);
         Assert.assertEquals(encryptedImages.size(), 2);
         Assert.assertTrue(encryptedImages.containsValue(encryptedImageId));
         Assert.assertTrue(encryptedImages.containsValue(secondEncryptedImageId));
