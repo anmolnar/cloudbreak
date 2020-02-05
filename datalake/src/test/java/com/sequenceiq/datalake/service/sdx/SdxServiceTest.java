@@ -286,7 +286,7 @@ class SdxServiceTest {
         CloudPlatform cp = CloudPlatform.AWS;
         Stream.of(SdxClusterShape.values())
                 .filter(a -> !a.equals(SdxClusterShape.CUSTOM))
-                .forEach(a -> assertStackV4Request(cp, a));
+                .forEach(a -> assertStackV4Request("aws", cp, a));
     }
 
     @Test
@@ -294,7 +294,7 @@ class SdxServiceTest {
         CloudPlatform cp = CloudPlatform.AZURE;
         Stream.of(SdxClusterShape.values())
                 .filter(a -> !a.equals(SdxClusterShape.CUSTOM))
-                .forEach(a -> assertStackV4Request(cp, a));
+                .forEach(a -> assertStackV4Request("aws", cp, a));
     }
 
     @Test
@@ -302,11 +302,11 @@ class SdxServiceTest {
         CloudPlatform cp = CloudPlatform.YARN;
         Stream.of(SdxClusterShape.values())
                 .filter(a -> !a.equals(SdxClusterShape.CUSTOM))
-                .forEach(a -> assertStackV4Request(cp, a));
+                .forEach(a -> assertStackV4Request("aws", cp, a));
     }
 
-    private void assertStackV4Request(CloudPlatform type, SdxClusterShape shape) {
-        StackV4Request lightDutyStackrequest = underTest.getStackRequestFromFile(underTest.generateClusterTemplatePath(type.toString(), shape));
+    private void assertStackV4Request(String cdpVersion, CloudPlatform type, SdxClusterShape shape) {
+        StackV4Request lightDutyStackrequest = underTest.getStackRequestFromFile(underTest.generateClusterTemplatePath(cdpVersion, type.toString(), shape));
         assertNotNull(lightDutyStackrequest.getCluster().getBlueprintName(), "Bp name should be defined in all templates");
     }
 

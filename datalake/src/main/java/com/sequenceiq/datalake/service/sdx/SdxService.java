@@ -1,5 +1,27 @@
 package com.sequenceiq.datalake.service.sdx;
 
+import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
+import static com.sequenceiq.sdx.api.model.SdxClusterShape.CUSTOM;
+
+import java.io.IOException;
+import java.util.Collection;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
+import javax.annotation.Nonnull;
+import javax.inject.Inject;
+
+import org.apache.commons.lang3.StringUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.StackV4Endpoint;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.request.StackV4Request;
@@ -36,25 +58,6 @@ import com.sequenceiq.flow.core.ResourceIdProvider;
 import com.sequenceiq.sdx.api.model.SdxCloudStorageRequest;
 import com.sequenceiq.sdx.api.model.SdxClusterRequest;
 import com.sequenceiq.sdx.api.model.SdxClusterShape;
-import org.apache.commons.lang3.StringUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
-
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
-import javax.inject.Inject;
-import java.io.IOException;
-import java.util.Collection;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
-
-import static com.sequenceiq.cloudbreak.exception.NotFoundException.notFound;
-import static com.sequenceiq.sdx.api.model.SdxClusterShape.CUSTOM;
 
 @Service
 public class SdxService implements ResourceIdProvider {
@@ -80,9 +83,6 @@ public class SdxService implements ResourceIdProvider {
     private EnvironmentClientService environmentClientService;
 
     @Inject
-    private StackRequestManifester stackRequestManifester;
-
-    @Inject
     private SdxStatusService sdxStatusService;
 
     @Inject
@@ -93,6 +93,12 @@ public class SdxService implements ResourceIdProvider {
 
     @Inject
     private CloudStorageManifester cloudStorageManifester;
+
+    @Inject
+    private Map<CDPConfigKey, StackV4Request> cdpStackRequests;
+
+    @Value("${sdx.default.cdp.version:1.2}")
+    private String defaultCDPVersion;
 
     public Set<Long> findByResourceIdsAndStatuses(Set<Long> resourceIds, Set<DatalakeStatusEnum> statuses) {
         LOGGER.info("Searching for SDX cluster by ids and statuses.");
@@ -165,9 +171,17 @@ public class SdxService implements ResourceIdProvider {
             sdxCluster.setCloudStorageFileSystemType(sdxClusterRequest.getCloudStorage().getFileSystemType());
             sdxClusterRequest.getCloudStorage().setBaseLocation(trimmedBaseLocation);
         }
-        externalDatabaseConfigurer.configure(CloudPlatform.valueOf(environment.getCloudPlatform()), sdxClusterRequest.getExternalDatabase(), sdxCluster);
+        CloudPlatform cloudPlatform = CloudPlatform.valueOf(environment.getCloudPlatform());
+        externalDatabaseConfigurer.configure(cloudPlatform, sdxClusterRequest.getExternalDatabase(), sdxCluster);
         updateStackV4RequestWithEnvironmentCrnIfNotExistsOnIt(stackV4Request, environment.getCrn());
-        StackV4Request stackRequest = getStackRequest(stackV4Request, sdxClusterRequest.getClusterShape(), environment.getCloudPlatform());
+        String cdpVersion = getCdpVersion(sdxClusterRequest);
+        StackV4Request stackRequest = cdpStackRequests.get(new CDPConfigKey(cloudPlatform, sdxClusterRequest.getClusterShape(), cdpVersion));
+        if (stackRequest == null) {
+            LOGGER.error("Can't find template for cloudplatform: {}, shape {}, cdp version: {}", cloudPlatform, sdxClusterRequest.getClusterShape(),
+                    cdpVersion);
+            throw new BadRequestException("Can't find template for cloudplatform: " + cloudPlatform + ", shape: " + sdxClusterRequest.getClusterShape() +
+                    ", cdp version: " + cdpVersion);
+        }
         prepareCloudStorageForStack(sdxClusterRequest, stackRequest, sdxCluster, environment);
         try {
             sdxCluster.setStackRequest(JsonUtil.writeValueAsString(stackRequest));
@@ -186,6 +200,14 @@ public class SdxService implements ResourceIdProvider {
         sdxReactorFlowManager.triggerSdxCreation(sdxCluster.getId());
 
         return sdxCluster;
+    }
+
+    private String getCdpVersion(SdxClusterRequest sdxClusterRequest) {
+        if (sdxClusterRequest.getCdpVersion() != null) {
+            return sdxClusterRequest.getCdpVersion();
+        } else {
+            return defaultCDPVersion;
+        }
     }
 
     private void updateStackV4RequestWithEnvironmentCrnIfNotExistsOnIt(StackV4Request request, String environmentCrn) {
@@ -272,16 +294,6 @@ public class SdxService implements ResourceIdProvider {
                 && StringUtils.isNotEmpty(clusterRequest.getCloudStorage().getBaseLocation());
     }
 
-    private StackV4Request getStackRequest(@Nullable StackV4Request internalStackRequest, SdxClusterShape shape, String cloudPlatform) {
-        if (internalStackRequest == null) {
-            String clusterTemplatePath = generateClusterTemplatePath(cloudPlatform, shape);
-            LOGGER.info("Using path of {} based on Cloudplatform {} and Shape {}", clusterTemplatePath, cloudPlatform, shape);
-            return getStackRequestFromFile(clusterTemplatePath);
-        } else {
-            return internalStackRequest;
-        }
-    }
-
     protected StackV4Request getStackRequestFromFile(String templatePath) {
         try {
             String clusterTemplateJson = FileReaderUtils.readFileFromClasspath(templatePath);
@@ -316,9 +328,9 @@ public class SdxService implements ResourceIdProvider {
                 .collect(Collectors.toList());
     }
 
-    protected String generateClusterTemplatePath(String cloudPlatform, SdxClusterShape shape) {
+    protected String generateClusterTemplatePath(String cdpPlatform, String cloudPlatform, SdxClusterShape shape) {
         String convertedShape = shape.toString().toLowerCase().replaceAll("_", "-");
-        return "sdx/" + cloudPlatform.toLowerCase() + "/cluster-" + convertedShape + "-template.json";
+        return "cdp/" + cdpPlatform.replace(".", "_") + "/" + cloudPlatform.toLowerCase() + "/cluster-" + convertedShape + "-template.json";
     }
 
     private void validateSdxRequest(String name, String envName, String accountId) {
