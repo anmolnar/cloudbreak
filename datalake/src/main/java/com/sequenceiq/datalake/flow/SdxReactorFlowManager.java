@@ -19,10 +19,11 @@ import org.springframework.stereotype.Service;
 
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.response.UpgradeOptionV4Response;
 import com.sequenceiq.cloudbreak.auth.ThreadBasedUserCrnProvider;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
+import com.sequenceiq.cloudbreak.common.event.AutoAccepted;
 import com.sequenceiq.cloudbreak.exception.CloudbreakApiException;
 import com.sequenceiq.cloudbreak.exception.FlowsAlreadyRunningException;
-import com.sequenceiq.datalake.entity.SdxCluster;
 import com.sequenceiq.datalake.flow.delete.event.SdxDeleteStartEvent;
 import com.sequenceiq.datalake.flow.repair.event.SdxRepairStartEvent;
 import com.sequenceiq.datalake.flow.start.event.SdxStartStartEvent;
@@ -32,9 +33,10 @@ import com.sequenceiq.datalake.service.sdx.SdxService;
 import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.core.Flow2Handler;
 import com.sequenceiq.flow.core.FlowConstants;
-import com.sequenceiq.flow.domain.FlowLog;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
+import com.sequenceiq.flow.core.model.PollableFlow;
+import com.sequenceiq.flow.core.model.PollableFlowChain;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
-import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
 import com.sequenceiq.sdx.api.model.SdxRepairRequest;
 
 import reactor.bus.Event;
@@ -50,9 +52,6 @@ public class SdxReactorFlowManager {
 
     @Inject
     private ErrorHandlerAwareReactorEventFactory eventFactory;
-
-    @Inject
-    private FlowLogDBService flowLogDBService;
 
     @Inject
     private SdxService sdxService;
@@ -109,17 +108,25 @@ public class SdxReactorFlowManager {
 
         reactor.notify(selector, event);
         try {
-            Boolean accepted = true;
+            AcceptResult accepted = AutoAccepted.INSTANCE;
             if (event.getData().accepted() != null) {
                 accepted = event.getData().accepted().await(WAIT_FOR_ACCEPT, TimeUnit.SECONDS);
             }
-            if (accepted == null || !accepted) {
+            if (accepted == null || AlreadyExistingFlow.INSTANCE.equals(accepted)) {
                 throw new FlowsAlreadyRunningException(String.format("Sdx cluster %s has flows under operation, request not allowed.",
                         event.getData().getResourceId()));
             } else {
-                SdxCluster sdxCluster = sdxService.getById(acceptable.getResourceId());
-                FlowLog flowLog = flowLogDBService.getLastFlowLogByResourceCrnOrName(sdxCluster.getClusterName());
-                return FlowStartResponse.of(flowLog.getFlowId(), flowLog.getFlowChainId());
+                if (AutoAccepted.INSTANCE.equals(accepted)) {
+                    return FlowStartResponse.autoAccepted();
+                } else if (PollableFlowChain.class.equals(accepted.getClass())) {
+                    PollableFlowChain pollableFlowChain = (PollableFlowChain) accepted;
+                    return FlowStartResponse.of(null, pollableFlowChain.getFlowChainId());
+                } else if (PollableFlow.class.equals(accepted.getClass())) {
+                    PollableFlow pollableFlow = (PollableFlow) accepted;
+                    return FlowStartResponse.of(pollableFlow.getFlowId(), null);
+                } else {
+                    throw new IllegalStateException("Unsupported accep result type: " + accepted.getClass());
+                }
             }
         } catch (InterruptedException e) {
             throw new CloudbreakApiException(e.getMessage());

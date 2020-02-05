@@ -11,10 +11,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.stereotype.Component;
 
 import com.sequenceiq.cloudbreak.auth.ThreadBasedUserCrnProvider;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
+import com.sequenceiq.cloudbreak.common.event.AutoAccepted;
 import com.sequenceiq.cloudbreak.common.event.Selectable;
 import com.sequenceiq.flow.core.Flow2Handler;
 import com.sequenceiq.flow.core.FlowConstants;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.api.event.BaseFlowEvent;
 import com.sequenceiq.freeipa.flow.stack.StackEvent;
@@ -63,11 +66,11 @@ public class FreeIpaFlowManager {
     private void notify(String selector, Event<Acceptable> event) {
         reactor.notify(selector, event);
         try {
-            Boolean accepted = true;
+            AcceptResult accepted = AutoAccepted.INSTANCE;
             if (event.getData().accepted() != null) {
                 accepted = event.getData().accepted().await(WAIT_FOR_ACCEPT, TimeUnit.SECONDS);
             }
-            if (accepted == null || !accepted) {
+            if (accepted == null || AlreadyExistingFlow.INSTANCE.equals(accepted)) {
                 throw new RuntimeException("Flows under operation, request not allowed.");
             }
         } catch (InterruptedException e) {

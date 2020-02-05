@@ -14,12 +14,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.sequenceiq.cloudbreak.auth.ThreadBasedUserCrnProvider;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
+import com.sequenceiq.cloudbreak.common.event.AutoAccepted;
 import com.sequenceiq.cloudbreak.common.event.Selectable;
 import com.sequenceiq.cloudbreak.common.service.Clock;
 import com.sequenceiq.flow.core.Flow2Handler;
 import com.sequenceiq.flow.core.FlowConstants;
 import com.sequenceiq.flow.core.FlowLogService;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.api.event.BaseFlowEvent;
 import com.sequenceiq.redbeams.flow.redbeams.common.RedbeamsEvent;
@@ -76,11 +79,11 @@ public class RedbeamsFlowManager {
     private void notify(String selector, Event<Acceptable> event) {
         reactor.notify(selector, event);
         try {
-            Boolean accepted = true;
+            AcceptResult accepted = AutoAccepted.INSTANCE;
             if (event.getData().accepted() != null) {
                 accepted = event.getData().accepted().await(WAIT_FOR_ACCEPT, TimeUnit.SECONDS);
             }
-            if (accepted == null || !accepted) {
+            if (accepted == null || AlreadyExistingFlow.INSTANCE.equals(accepted)) {
                 throw new RuntimeException(String.format("Flows under operation, request not allowed."));
             }
         } catch (InterruptedException e) {

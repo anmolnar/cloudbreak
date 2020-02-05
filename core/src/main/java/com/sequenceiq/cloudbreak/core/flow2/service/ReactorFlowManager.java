@@ -32,7 +32,9 @@ import com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.request.HostGroupAdjustmentV4Request;
 import com.sequenceiq.cloudbreak.auth.ThreadBasedUserCrnProvider;
 import com.sequenceiq.cloudbreak.auth.security.authentication.AuthenticatedUserService;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
+import com.sequenceiq.cloudbreak.common.event.AutoAccepted;
 import com.sequenceiq.cloudbreak.common.type.ScalingType;
 import com.sequenceiq.cloudbreak.core.flow2.chain.FlowChainTriggers;
 import com.sequenceiq.cloudbreak.core.flow2.cluster.datalake.EphemeralClusterEvent;
@@ -65,10 +67,11 @@ import com.sequenceiq.cloudbreak.workspace.model.User;
 import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.core.Flow2Handler;
 import com.sequenceiq.flow.core.FlowConstants;
-import com.sequenceiq.flow.domain.FlowLog;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
+import com.sequenceiq.flow.core.model.PollableFlow;
+import com.sequenceiq.flow.core.model.PollableFlowChain;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.config.EventBusStatisticReporter;
-import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
 
 import reactor.bus.Event;
 import reactor.bus.EventBus;
@@ -82,7 +85,7 @@ import reactor.rx.Promise;
 public class ReactorFlowManager {
     private static final Logger LOGGER = LoggerFactory.getLogger(ReactorFlowManager.class);
 
-    private static final long WAIT_FOR_ACCEPT = 10L;
+    private static final long WAIT_FOR_ACCEPT = 1000L;
 
     private static final List<String> ALLOWED_FLOW_TRIGGERS_IN_MAINTENANCE = List.of(
             FlowChainTriggers.FULL_SYNC_TRIGGER_EVENT,
@@ -110,9 +113,6 @@ public class ReactorFlowManager {
 
     @Inject
     private KerberosConfigService kerberosConfigService;
-
-    @Inject
-    private FlowLogDBService flowLogDBService;
 
     public FlowStartResponse triggerProvisioning(Long stackId) {
         String selector = FlowChainTriggers.FULL_PROVISION_TRIGGER_EVENT;
@@ -332,7 +332,7 @@ public class ReactorFlowManager {
         reactorReporter.logInfoReport();
         reactor.notify(selector, event);
         try {
-            Boolean accepted = true;
+            AcceptResult accepted = AutoAccepted.INSTANCE;
             if (event.getData().accepted() != null) {
                 accepted = event.getData().accepted().await(WAIT_FOR_ACCEPT, TimeUnit.SECONDS);
             }
@@ -340,12 +340,21 @@ public class ReactorFlowManager {
                 reactorReporter.logErrorReport();
                 throw new FlowNotAcceptedException(String.format("Timeout happened when trying to start the flow for stack %s.", stack.getName()));
             }
-            if (!accepted) {
+            if (AlreadyExistingFlow.INSTANCE.equals(accepted)) {
                 reactorReporter.logErrorReport();
                 throw new FlowsAlreadyRunningException(String.format("Stack %s has flows under operation, request not allowed.", stack.getName()));
             }
-            FlowLog flowLog = flowLogDBService.getLastFlowLogByResourceCrnOrName(stack.getName());
-            return FlowStartResponse.of(flowLog.getFlowId(), flowLog.getFlowChainId());
+            if (AutoAccepted.INSTANCE.equals(accepted)) {
+                return FlowStartResponse.autoAccepted();
+            } else if (PollableFlowChain.class.equals(accepted.getClass())) {
+                PollableFlowChain pollableFlowChain = (PollableFlowChain) accepted;
+                return FlowStartResponse.of(null, pollableFlowChain.getFlowChainId());
+            } else if (PollableFlow.class.equals(accepted.getClass())) {
+                PollableFlow pollableFlow = (PollableFlow) accepted;
+                return FlowStartResponse.of(pollableFlow.getFlowId(), null);
+            } else {
+                throw new IllegalStateException("Unsupported accep result type: " + accepted.getClass());
+            }
         } catch (InterruptedException e) {
             throw new CloudbreakApiException(e.getMessage());
         }

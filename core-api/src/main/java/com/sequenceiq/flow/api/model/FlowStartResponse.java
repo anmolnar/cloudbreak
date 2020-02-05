@@ -2,20 +2,16 @@ package com.sequenceiq.flow.api.model;
 
 import java.util.Objects;
 
-import com.fasterxml.jackson.annotation.JsonCreator;
-import com.fasterxml.jackson.annotation.JsonProperty;
-
 public class FlowStartResponse implements Pollable {
 
-    public static final FlowStartResponse IMMEDIATE = new FlowStartResponse("IMMEDIATE", "IMMEDIATE");
+    private String flowId;
 
-    private final String flowId;
+    private String flowChainId;
 
-    private final String flowChainId;
+    public FlowStartResponse() {
+    }
 
-    @JsonCreator
-    public FlowStartResponse(@JsonProperty("flowId") String flowId,
-            @JsonProperty("flowChainId") String flowChainId) {
+    public FlowStartResponse(String flowId, String flowChainId) {
         this.flowId = flowId;
         this.flowChainId = flowChainId;
     }
@@ -24,14 +20,26 @@ public class FlowStartResponse implements Pollable {
         return new FlowStartResponse(flowId, flowChainId);
     }
 
+    public static FlowStartResponse autoAccepted() {
+        return new FlowStartResponse("AUTO_ACCEPTED", "AUTO_ACCEPTED");
+    }
+
     @Override
     public String getFlowId() {
         return flowId;
     }
 
+    public void setFlowId(String flowId) {
+        this.flowId = flowId;
+    }
+
     @Override
     public String getFlowChainId() {
         return flowChainId;
+    }
+
+    public void setFlowChainId(String flowChainId) {
+        this.flowChainId = flowChainId;
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.sequenceiq.datalake.entity.SdxCluster;
 import com.sequenceiq.datalake.repository.SdxClusterRepository;
 import com.sequenceiq.flow.api.FlowEndpoint;
 import com.sequenceiq.flow.api.model.FlowLogResponse;
+import com.sequenceiq.flow.api.model.FlowStartResponse;
 import com.sequenceiq.flow.api.model.Pollable;
 import com.sequenceiq.flow.api.model.StateStatus;
 
@@ -39,7 +40,7 @@ public class CloudbreakFlowService {
     }
 
     public void saveLastCloudbreakFlowChainId(SdxCluster sdxCluster, Pollable pollable) {
-        if (pollable.getFlowChainId() == null) {
+        if (pollable == null || FlowStartResponse.autoAccepted().equals(pollable) || pollable.getFlowChainId() == null) {
             LOGGER.info("Cloudbreak not sent flow chain id for cluster falling back to flow API.");
             getAndSaveLastCloudbreakFlowChainId(sdxCluster);
         } else {

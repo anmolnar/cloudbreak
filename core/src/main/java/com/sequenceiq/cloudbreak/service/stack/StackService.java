@@ -587,7 +587,7 @@ public class StackService implements ResourceIdProvider {
             default:
                 throw new BadRequestException("Cannot update the status of stack because status request not valid.");
         }
-        return FlowStartResponse.IMMEDIATE;
+        return FlowStartResponse.autoAccepted();
     }
 
     Optional<Stack> findTemplateWithLists(Long id) {
@@ -725,7 +725,7 @@ public class StackService implements ResourceIdProvider {
     private FlowStartResponse stop(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         if (cluster != null && cluster.isStopInProgress()) {
             setStackStatusToStopRequested(stack);
-            return FlowStartResponse.IMMEDIATE;
+            return FlowStartResponse.autoAccepted();
         } else {
             return triggerStackStopIfNeeded(stack, cluster, updateCluster, user);
         }
@@ -734,7 +734,7 @@ public class StackService implements ResourceIdProvider {
     private FlowStartResponse triggerStackStopIfNeeded(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
         if (!isStopNeeded(stack)) {
-            return FlowStartResponse.IMMEDIATE;
+            return FlowStartResponse.autoAccepted();
         }
         if (cluster != null && !cluster.isStopped() && !stack.isStopFailed()) {
             if (!updateCluster) {
@@ -743,7 +743,7 @@ public class StackService implements ResourceIdProvider {
             } else if (cluster.isClusterReadyForStop() || cluster.isStopFailed()) {
                 setStackStatusToStopRequested(stack);
                 clusterService.updateStatus(stack.getId(), StatusRequest.STOPPED);
-                return FlowStartResponse.IMMEDIATE;
+                return FlowStartResponse.autoAccepted();
             } else {
                 throw new BadRequestException(String.format("Cannot update the status of cluster '%s' to STOPPED, because the cluster's state is %s.",
                         cluster.getName(), cluster.getStatus()));
@@ -777,7 +777,7 @@ public class StackService implements ResourceIdProvider {
 
     private FlowStartResponse start(Stack stack, Cluster cluster, boolean updateCluster, User user) {
         permissionCheckingUtils.checkPermissionForUser(AuthorizationResource.DATAHUB, ResourceAction.WRITE, user.getUserCrn());
-        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
+        FlowStartResponse flowStartResponse = FlowStartResponse.autoAccepted();
         if (stack.isAvailable()) {
             eventService.fireCloudbreakEvent(stack.getId(), AVAILABLE.name(), STACK_START_IGNORED);
         } else if ((!stack.isStopped() || (cluster != null && !cluster.isStopped())) && !stack.isStartFailed()) {

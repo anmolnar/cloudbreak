@@ -157,7 +157,7 @@ public class ClusterCommonService {
                     cluster.getId(), cluster.getStatus()));
         }
 
-        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
+        FlowStartResponse flowStartResponse = FlowStartResponse.autoAccepted();
         switch (maintenanceMode) {
             case ENABLED:
                 saveAndFireEventOnClusterStatusChange(cluster, stack.getId(), MAINTENANCE_MODE_ENABLED, ResourceEvent.MAINTENANCE_MODE_ENABLED);

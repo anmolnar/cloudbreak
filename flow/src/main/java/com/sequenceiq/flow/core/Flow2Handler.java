@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
 import com.cedarsoftware.util.io.JsonReader;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
 import com.sequenceiq.cloudbreak.common.event.Payload;
 import com.sequenceiq.cloudbreak.common.service.TransactionService;
@@ -25,6 +26,9 @@ import com.sequenceiq.flow.core.chain.FlowChainHandler;
 import com.sequenceiq.flow.core.chain.FlowChains;
 import com.sequenceiq.flow.core.config.FlowConfiguration;
 import com.sequenceiq.flow.core.exception.FlowNotFoundException;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
+import com.sequenceiq.flow.core.model.PollableFlow;
+import com.sequenceiq.flow.core.model.PollableFlowChain;
 import com.sequenceiq.flow.domain.FlowLog;
 
 import reactor.bus.Event;
@@ -106,12 +110,17 @@ public class Flow2Handler implements Consumer<Event<? extends Payload>> {
                             return;
                         }
                         flowId = UUID.randomUUID().toString();
+                        AcceptResult acceptResult;
+                        if (flowChainId != null) {
+                            acceptResult = new PollableFlowChain(flowChainId);
+                        } else {
+                            acceptResult = new PollableFlow(flowId);
+                        }
                         flowParameters.setFlowId(flowId);
                         Flow flow = flowConfig.createFlow(flowId, payload.getResourceId());
                         flow.initialize(contextParams);
                         flowLogService.save(flowParameters, flowChainId, key, payload, null, flowConfig.getClass(), flow.getCurrentState());
-
-                        acceptFlow(payload);
+                        acceptFlow(payload, acceptResult);
                         logFlowId(flowId);
                         runningFlows.put(flow, flowChainId);
                         flow.sendEvent(key, flowParameters.getFlowTriggerUserCrn(), payload);
@@ -153,18 +162,18 @@ public class Flow2Handler implements Consumer<Event<? extends Payload>> {
         if (payload instanceof Acceptable && ((Acceptable) payload).accepted() != null) {
             Acceptable acceptable = (Acceptable) payload;
             if (!applicationFlowInformation.getAllowedParallelFlows().contains(key) && flowLogService.isOtherFlowRunning(payload.getResourceId())) {
-                acceptable.accepted().accept(Boolean.FALSE);
+                acceptable.accepted().accept(AlreadyExistingFlow.INSTANCE);
                 return false;
             }
         }
         return true;
     }
 
-    private void acceptFlow(Payload payload) {
+    private void acceptFlow(Payload payload, AcceptResult acceptResult) {
         if (payload instanceof Acceptable && ((Acceptable) payload).accepted() != null) {
             Acceptable acceptable = (Acceptable) payload;
             if (!acceptable.accepted().isComplete()) {
-                acceptable.accepted().accept(Boolean.TRUE);
+                acceptable.accepted().accept(acceptResult);
             }
         }
     }

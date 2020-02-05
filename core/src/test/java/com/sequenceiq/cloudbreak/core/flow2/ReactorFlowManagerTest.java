@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyObject;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.reset;
@@ -30,6 +29,7 @@ import com.sequenceiq.cloudbreak.api.endpoint.v4.autoscales.request.InstanceGrou
 import com.sequenceiq.cloudbreak.api.endpoint.v4.common.Status;
 import com.sequenceiq.cloudbreak.api.endpoint.v4.stacks.request.HostGroupAdjustmentV4Request;
 import com.sequenceiq.cloudbreak.auth.security.authentication.AuthenticatedUserService;
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
 import com.sequenceiq.cloudbreak.common.event.Acceptable;
 import com.sequenceiq.cloudbreak.common.exception.CloudbreakServiceException;
 import com.sequenceiq.cloudbreak.core.flow2.chain.FlowChainTriggers;
@@ -39,10 +39,9 @@ import com.sequenceiq.cloudbreak.exception.CloudbreakApiException;
 import com.sequenceiq.cloudbreak.kerberos.KerberosConfigService;
 import com.sequenceiq.cloudbreak.service.stack.StackService;
 import com.sequenceiq.cloudbreak.service.stack.repair.UnhealthyInstances;
-import com.sequenceiq.flow.domain.FlowLog;
+import com.sequenceiq.flow.core.model.PollableFlow;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 import com.sequenceiq.flow.reactor.config.EventBusStatisticReporter;
-import com.sequenceiq.flow.service.flowlog.FlowLogDBService;
 
 import reactor.bus.Event;
 import reactor.bus.EventBus;
@@ -74,9 +73,6 @@ public class ReactorFlowManagerTest {
     @Mock
     private KerberosConfigService kerberosConfigService;
 
-    @Mock
-    private FlowLogDBService flowLogDBService;
-
     private Stack stack;
 
     @InjectMocks
@@ -94,10 +90,6 @@ public class ReactorFlowManagerTest {
         when(stackService.getByIdWithListsInTransaction(anyLong())).thenReturn(stack);
         when(eventFactory.createEventWithErrHandler(any(), any())).thenReturn(new Event<>(acceptable));
         when(authenticatedUserService.getUserCrn()).thenReturn("usercrn");
-        FlowLog flowLog = new FlowLog();
-        flowLog.setFlowId("FLOW_ID");
-        flowLog.setFlowChainId("FLOW_CHAIN_ID");
-        when(flowLogDBService.getLastFlowLogByResourceCrnOrName(anyString())).thenReturn(flowLog);
     }
 
     @Test
@@ -242,9 +234,9 @@ public class ReactorFlowManagerTest {
 
     private static class TestAcceptable implements Acceptable {
         @Override
-        public Promise<Boolean> accepted() {
-            Promise<Boolean> a = new Promise<>();
-            a.accept(true);
+        public Promise<AcceptResult> accepted() {
+            Promise<AcceptResult> a = new Promise<>();
+            a.accept(new PollableFlow("FLOW_ID"));
             return a;
         }
 

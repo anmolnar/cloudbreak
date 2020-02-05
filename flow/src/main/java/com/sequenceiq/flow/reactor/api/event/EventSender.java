@@ -5,6 +5,9 @@ import java.util.concurrent.TimeUnit;
 
 import org.springframework.stereotype.Component;
 
+import com.sequenceiq.cloudbreak.common.event.AcceptResult;
+import com.sequenceiq.cloudbreak.common.event.AutoAccepted;
+import com.sequenceiq.flow.core.model.AlreadyExistingFlow;
 import com.sequenceiq.flow.reactor.ErrorHandlerAwareReactorEventFactory;
 
 import reactor.bus.Event;
@@ -40,11 +43,11 @@ public class EventSender {
         Event<BaseFlowEvent> eventWithErrHandler = eventFactory.createEventWithErrHandler(new HashMap<>(headers.asMap()), event);
         reactor.notify(event.selector(), eventWithErrHandler);
         try {
-            Boolean accepted = true;
+            AcceptResult accepted = AutoAccepted.INSTANCE;
             if (eventWithErrHandler.getData().accepted() != null) {
                 accepted = eventWithErrHandler.getData().accepted().await(TIMEOUT, TimeUnit.SECONDS);
             }
-            if (accepted == null || !accepted) {
+            if (accepted == null || AlreadyExistingFlow.INSTANCE.equals(accepted)) {
                 throw new IllegalStateException(String.format("Resource %s has flow under operation, request is not allowed.", resourceName));
             }
         } catch (InterruptedException e) {

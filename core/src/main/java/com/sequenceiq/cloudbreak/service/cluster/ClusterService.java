@@ -416,7 +416,7 @@ public class ClusterService {
         if (cluster == null) {
             throw new BadRequestException(String.format("There is no cluster installed on stack '%s'.", stack.getName()));
         }
-        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
+        FlowStartResponse flowStartResponse = FlowStartResponse.autoAccepted();
         switch (statusRequest) {
             case SYNC:
                 sync(stack);
@@ -618,7 +618,7 @@ public class ClusterService {
     }
 
     private FlowStartResponse start(Stack stack, Cluster cluster) {
-        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
+        FlowStartResponse flowStartResponse = FlowStartResponse.autoAccepted();
         if (stack.isStartInProgress()) {
             eventService.fireCloudbreakEvent(stack.getId(), START_REQUESTED.name(), CLUSTER_START_REQUESTED);
             updateClusterStatusByStackId(stack.getId(), START_REQUESTED);
@@ -641,7 +641,7 @@ public class ClusterService {
 
     private FlowStartResponse stop(Stack stack, Cluster cluster) {
         StopRestrictionReason reason = stack.isInfrastructureStoppable();
-        FlowStartResponse flowStartResponse = FlowStartResponse.IMMEDIATE;
+        FlowStartResponse flowStartResponse = FlowStartResponse.autoAccepted();
         if (cluster.isStopped()) {
             eventService.fireCloudbreakEvent(stack.getId(), stack.getStatus().name(), CLUSTER_STOP_IGNORED);
         } else if (reason != StopRestrictionReason.NONE) {
